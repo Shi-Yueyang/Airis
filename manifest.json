@@ -1,0 +1,65 @@
+{
+  "app_id": "airis",
+  "version": "1.2.0",
+  "name": "Airis 铁路测试数据智能体",
+  "description": "面向铁路产品测试的数据制作智能体：用自然语言完成 CVC 应用数据的反解、生成、定点修改与校验。",
+  "workspace_mode": "isolated",
+  "entrypoints": {
+    "default": "chat",
+    "items": [
+      {
+        "id": "chat",
+        "type": "chat"
+      }
+    ]
+  },
+  "agent_ui": {
+    "visible": [
+      "airis"
+    ],
+    "labels": {
+      "airis": {
+        "zh-Hans": "Airis 数据制作助手",
+        "zh-Hant": "Airis 資料製作助手",
+        "en-US": "Airis Test Data Assistant"
+      }
+    }
+  },
+  "listing": {
+    "subtitle": "自然语言反解、生成和定点修改 CVC 应用数据文件",
+    "description_md": "Airis 是面向铁路产品研发与测试人员的数据制作智能体。当前版本内置 cvc-data 技能，支持对 CVC 应用数据文件 ASW1.bin、Config2.line1、Config1.train 进行反解、生成、定点修改与校验：用户上传 ATP/SDMU 配置模板和原始数据后，可用自然语言查看字段遍历报告、解释 CRC 与模板版本告警、按参数名生成三件套，或只修改指定字段并保持其余内容不变。所有生成与修改结果都会重新反解校验，并要求 CRC 与字段遍历通过，必要时输出修改前后差异。后续版本可按相同方式接入平台配置、TACN 二进制、应答器轨旁报文等技能。",
+    "category": "dev",
+    "support_contact": "airis-team@example.com"
+  },
+  "chat_empty_state": {
+    "headline_accent": "Airis",
+    "headline_rest": "铁路测试数据智能体",
+    "subtitle": "描述测试意图，或上传模板与原始配置，我会规划步骤并调用技能完成数据制作。",
+    "cards": [
+      {
+        "title": "反解 CVC 应用数据",
+        "desc": "查看字段遍历报告与告警",
+        "prompt": "反解我上传的 ASW1.bin、Config2.line1 和 Config1.train，用 ATP/SDMU 模板输出字段报告和告警。",
+        "icon": "file"
+      },
+      {
+        "title": "定点修改配置参数",
+        "desc": "只改目标字段，其余保持不变",
+        "prompt": "在现有 CVC 配置基础上，把 TRAIN 类的 TRAIN_ALLOW_SPEED 改成 220，其他字段保持不变，并输出差异。",
+        "icon": "bolt"
+      },
+      {
+        "title": "从模板生成数据三件套",
+        "desc": "按 values.json 序列化输出",
+        "prompt": "根据我提供的 ATP 和 SDMU 模板以及 values.json，生成 ASW1.bin、Config2.line1、Config1.train。",
+        "icon": "code"
+      },
+      {
+        "title": "校验并输出报告",
+        "desc": "检查 CRC 与字段遍历结果",
+        "prompt": "校验刚生成的 CVC 数据文件，确认 CRC 和字段遍历都通过，并输出校验报告。",
+        "icon": "search"
+      }
+    ]
+  }
+}
