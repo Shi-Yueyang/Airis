@@ -37,19 +37,19 @@
     "subtitle": "描述测试意图，或上传模板、报文与原始配置，我会规划步骤并调用技能完成数据制作。",
     "cards": [
       {
+        "title": "生成 CVC 数据",
+        "desc": "按 values.json 生成，只改目标字段",
+        "prompt": "根据 ATP 和 SDMU 模板以及 values.json 生成 CVC 三件套；如果是修改，只改我指定的字段，其余保持不变并输出差异。",
+        "icon": "bolt"
+      },
+      {
         "title": "反解 CVC 应用数据",
         "desc": "查看字段遍历报告与告警",
         "prompt": "反解我上传的 ASW1.bin、Config2.line1 和 Config1.train，用 ATP/SDMU 模板输出字段报告和告警。",
         "icon": "file"
       },
       {
-        "title": "生成或修改 CVC 数据",
-        "desc": "按 values.json 生成，只改目标字段",
-        "prompt": "根据 ATP 和 SDMU 模板以及 values.json 生成 CVC 三件套；如果是修改，只改我指定的字段，其余保持不变并输出差异。",
-        "icon": "bolt"
-      },
-      {
-        "title": "生成 RBC 报文 hex",
+        "title": "生成 RBC 报文",
         "desc": "按取值 JSON 输出可联调的报文串",
         "prompt": "按我给的取值生成一条 M3 行车许可报文（含 P15 和 CTCS-150），输出 hex 报文串并说明各字段取值。",
         "icon": "code"
