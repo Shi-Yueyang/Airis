@@ -1,0 +1,47 @@
+name: Build OpenApp package
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+
+jobs:
+  build:
+    name: Validate and package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate app package
+        run: |
+          python .opencode/skills/package-and-validate/scripts/validate_app_package.py .
+
+      - name: Build .opapp.tgz
+        run: |
+          # 构建脚本把产物写到仓库的上一级目录，文件名由 manifest 的 app_id + version 决定
+          python .opencode/skills/package-and-validate/scripts/build_opapp_tgz.py .
+          mkdir -p dist
+          cp ../*.opapp.tgz dist/
+          ls -l dist
+          sha256sum dist/*.opapp.tgz | tee dist/SHA256SUMS
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: airis-opapp
+          path: |
+            dist/*.opapp.tgz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
