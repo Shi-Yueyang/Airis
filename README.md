@@ -1,7 +1,7 @@
 # Airis 铁路测试数据智能体
 
 - **app_id**: `airis`
-- **版本**: 1.3.0
+- **版本**: 1.3.1
 - **类型**: 对话型应用
 - **用途**: 面向铁路产品研发与测试人员，用自然语言驱动测试数据的反解、生成、定点修改与校验。
 
@@ -118,7 +118,7 @@ python .\.opencode\skills\package-and-validate\scripts\build_opapp_tgz.py .
 产物默认写到项目目录的上一级：
 
 ```text
-airis-1.3.0.opapp.tgz
+airis-1.3.1.opapp.tgz
 ```
 
 `package-and-validate` 是开发专用技能，打包时会被自动排除，不会出现在 `.opapp.tgz` 中。包内只包含 `manifest.json`、`.opencode/` 运行配置和应用技能。
