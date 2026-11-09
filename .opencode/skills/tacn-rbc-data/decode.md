@@ -31,7 +31,7 @@ python <skill-dir>/scripts/dump_rbc_msg.py m3.hex --values-out values.json -o re
 | `--split` | 拼接流逐条解析（按 L_MESSAGE 切） |
 | `--values-out PATH` | 额外导出取值 JSON（编辑回环用） |
 | `--p72-charset utf-16-be\|utf-16-le\|gb18030` | P72 纯文本编码（附录 B-1） |
-| `--ctcs132-sig-bits N` | CTCS-132 的 NID_SIG 位宽（附录 B-6） |
+| `--ctcs132-sig-bits N` | CTCS-132 的 NID_SIG 位宽（附录 B-5） |
 
 ## 怎么看报告
 

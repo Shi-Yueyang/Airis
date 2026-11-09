@@ -527,7 +527,7 @@ user_packet(152, "后车信息", G2T, [
 ] + _pressures() + [
     f("KILOMETER_POST", 32, dflt=SENT_32, sent=SENT_32, note="公里标"),
 ] + _reserved2(),
-    note="协议标注 L_PACKET=118 但按字段表算是 240 bit，本实现按字段表；见附录 B")
+    fixed_lp=240)
 
 user_packet(54, "车载电子地图版本", T2G, [
     f("N_PKTNUM", 6, lo=1, hi=63, note="拆分总包数 N：1~63"),
@@ -1353,7 +1353,7 @@ def enc_entry(msg, spec, user_spec, raw_values, scope, writer, ctx, fid):
         if fixed is not None and computed != fixed:
             raise SpecError(
                 "%s: 计算得 L_PACKET=%d bit，协议固定 %d bit —— 迭代计数或条件字段与协议不符"
-                "（协议定长包：P3=186 P57=49 P58=56 P65=71 P66=31 P4=29 CTCS-136=46）"
+                "（协议定长包：P3=186 P57=49 P58=56 P65=71 P66=31 P4=29 CTCS-136=46 CTCS-152=240）"
                 % (frame, computed, fixed))
     stale = values.leftovers()
     if stale:

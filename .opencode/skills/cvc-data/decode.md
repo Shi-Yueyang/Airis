@@ -1,89 +1,60 @@
-# Decode — Inspect CVC Data Files
+# 反解 — 检查 CVC 数据文件
 
-Decode CVC application-data binaries into a field-walk report using the ATP
-and SDMU template XMLs. Read-only: this workflow never writes to the source
-files.
+使用 ATP 与 SDMU 模板 XML 把 CVC 应用数据二进制反解成字段遍历报告。只读：本流程绝不写入源文件。
 
-## Format reference
+## 格式参考
 
-The wire format (TLV framing, magics per DIST class, canonical ATP→SDMU
-field order, reference regression sizes) is defined in
-`references/protocol.md` in this skill's folder.
+线格式（TLV 帧结构、各 DIST 类的 magic、固定的 ATP→SDMU 字段顺序、参考回归尺寸）定义在本技能目录的 `references/protocol.md`。
 
-## Inputs
+## 输入
 
-- Data files named by convention `ASW1.bin` (DP), `Config2.line1` (LINE),
-  `Config1.train` (TRAIN), but identified by magic, not name. Single
-  per-class files only; a concatenated stream with the 8-byte version tail
-  is not decodable here.
-- The ATP and SDMU template XMLs (`ATPCfgTemplate.xml`,
-  `SDMUCfgTemplate.xml`) so every field has a template. Templates are
-  matched to fields by `<ASW SYMBOL>`, not by argument order.
-- Python 3, standard library only.
+- 按惯例命名为 `ASW1.bin`（DP）、`Config2.line1`（LINE）、`Config1.train`（TRAIN）的数据文件，但实际按 magic 识别，不按文件名。只支持单个按类拆分的文件；带 8 字节版本尾的拼接流不能在这里反解。
+- ATP 与 SDMU 模板 XML（`ATPCfgTemplate.xml`、`SDMUCfgTemplate.xml`），确保每个字段都有模板。模板按 `<ASW SYMBOL>` 匹配字段，不按参数顺序。
+- Python 3，仅标准库。
 
-## Decoding
+## 规则
 
-The decoder is `scripts/dump_cvc_data.py`; `<skill-dir>` below is this
-skill's folder. Input and output paths resolve relative to the current
-working directory. All files can be decoded in one call:
+1. **只读**：绝不编辑或覆盖源文件；反解只产生报告和可选的 values 捕获。
+2. **不猜测**：未知 magic、文件过短、长度越界、缺字段都只报告；没有模板的字段列为未反解，不要为无法反解的区域编造取值。
+3. **先判定可信再依赖**：只有每个文件都显示 `crc=OK`、每个字段都显示 `walk=OK` 且没有未计入字节、并且没有告警触发时，解码值才可信。
+4. **先处理告警**：`CRC MISMATCH`、`TEMPLATE/DATA MISMATCH`、`OUT-OF-RANGE`、`no template for field` 等告警必须解决或解释清楚，再使用任何解码或捕获的取值。
 
-```sh
-python <skill-dir>/scripts/dump_cvc_data.py \
-  -t ATPCfgTemplate.xml -t SDMUCfgTemplate.xml \
-  ASW1.bin Config2.line1 Config1.train \
-  -o decoded_report.md
-```
+## 工作流
 
-`-o` writes the Markdown report to a file; without it the report goes to
-stdout. Add `--values-out values.json` to also capture the fully namespaced
-`{class: {function: {NAME: value}}}` JSON that
-`scripts/gen_cvc_data.py --values` accepts for regeneration (this is the
-capture step of `edit.md`). REPEAT groups are emitted as lists. Fields whose
-walk failed are excluded from the capture; `EXTRA-SLOT` rows have no template
-name and are skipped with a warning.
+1. **准备输入** — 确认数据文件是按类拆分的单文件，并准备匹配的 ATP 与 SDMU 模板 XML。模板版本必须与数据版本一致。
+2. **执行反解** — 解码器是 `scripts/dump_cvc_data.py`；下文的 `<skill-dir>` 指本技能目录。输入输出路径相对当前工作目录解析。可以在一次调用中反解所有文件：
 
-## Interpreting the report
+   ```sh
+   python <skill-dir>/scripts/dump_cvc_data.py \
+     -t ATPCfgTemplate.xml -t SDMUCfgTemplate.xml \
+     ASW1.bin Config2.line1 Config1.train \
+     -o decoded_report.md
+   ```
 
-- File line: `DIST=… magic=0x… crc=OK|BAD file=…B fields=[0x66AA5599=18B, …]`
-  — CRC covers the whole file minus its trailing 4 bytes.
-- Field line: `field=… body=…B walk=OK` | `walk=OK+NB-unaccounted` (template
-  consumed fewer bytes than the body holds) |
-  `walk=INCOMPLETE(template-needs-more)` (body exhausted mid-walk). The last
-  two mean template/data version mismatch.
-- Table rows: per-parameter offset (relative to the field body), byte size,
-  name, hex and decimal value. Flags: `OUT-OF-RANGE [min..max]` (value
-  outside template bounds) and `EXTRA-SLOT` (count forces more entries than
-  the template pins).
-- A `PARAM` wrapper with `SYMBOL` is a nested TLV. For an optional wrapper,
-  the decoder checks for its 4-byte symbol at the current offset; if present,
-  it reads the 4-byte payload length and walks only that bounded payload.
-  Parameter offsets remain relative to the enclosing field body and therefore
-  include the 8-byte nested header. A declared/template length mismatch and
-  unconsumed wrapper payload are reported as warnings.
+   `-o` 把 Markdown 报告写入文件；不给则输出到 stdout。加 `--values-out values.json` 还会捕获完整的带命名空间 `{class: {function: {NAME: value}}}` JSON，`scripts/gen_cvc_data.py --values` 可直接用它重新生成（这是 `edit.md` 的捕获步骤）。REPEAT 组输出为列表。遍历失败的字段不会进入捕获；`EXTRA-SLOT` 行没有模板名，会跳过并告警。
+3. **解读报告** —
+   - 文件行：`DIST=… magic=0x… crc=OK|BAD file=…B fields=[0x66AA5599=18B, …]`
+     —— CRC 覆盖整个文件去掉末尾 4 字节。
+   - 字段行：`field=… body=…B walk=OK` | `walk=OK+NB-unaccounted`（模板消费的字节少于 body 实际长度） |
+     `walk=INCOMPLETE(template-needs-more)`（body 在遍历中途耗尽）。后两种都表示模板/数据版本不匹配。
+   - 表格行：每个参数的偏移（相对字段 body）、字节数、名称、十六进制和十进制取值。标记：`OUT-OF-RANGE [min..max]`（取值超出模板边界）和 `EXTRA-SLOT`（计数强制产生的条目多于模板固定的数量）。
+   - 带 `SYMBOL` 的 `PARAM` 包装是嵌套 TLV。对于可选包装，解码器会在当前偏移检查其 4 字节 symbol；存在则读取 4 字节载荷长度，只遍历该有界载荷。参数偏移仍相对外层字段 body，因此包含 8 字节嵌套头。声明长度与模板长度不一致、包装载荷未被完全消费，都会作为告警报告。
+4. **判定是否可信** — 逐文件确认 `crc=OK`；逐字段确认 `walk=OK` 且没有未计入字节；确认没有告警（`CRC MISMATCH`、`TEMPLATE/DATA MISMATCH`、`OUT-OF-RANGE`、`no template for field`、字段与 CRC 之间的未计入字节）。依赖任何解码或捕获的取值之前，先解决告警；`crc=OK walk=OK` 仍不能验证消费端领域语义。
+5. **报告** — 写清输入文件、模板、每个文件的 CRC 与字段遍历结果、告警清单，以及没有执行的检查。
 
-## Success criteria
+## 失败处理
 
-A decode is trustworthy only when every file shows `crc=OK`, every field
-shows `walk=OK` with no unaccounted bytes, and no warnings fire
-(`CRC MISMATCH`, `TEMPLATE/DATA MISMATCH`, `OUT-OF-RANGE`,
-`no template for field`, unaccounted bytes between fields and CRC). Resolve
-warnings before relying on any decoded or captured value;
-`crc=OK walk=OK` still does not validate consumer-side domain semantics.
+解码器只报告、不猜测：未知 magic、文件过短、长度越界和缺字段会产生按文件的 `ERROR` 行，批处理继续；没有提供模板的字段 symbol 会列为未反解。不要为无法反解的区域编造取值——说明失败了什么、为什么。
 
-## Malformed input
-
-The decoder reports and never guesses: unknown magic, too-short files,
-length overruns, and missing fields produce per-file `ERROR` lines while the
-batch continues; a field symbol with no supplied template is listed
-undecoded. Do not invent values for undecodable regions — say what failed
-and why.
-
-## Troubleshooting
-
-| Symptom | Cause | Solution |
+| 现象 | 原因 | 处理 |
 |---|---|---|
-| `CRC MISMATCH` | Stored CRC != computed over the covered range. | Treat the file as corrupted/modified; verify against a trusted source. |
-| `TEMPLATE/DATA MISMATCH` | Template revision differs from the data's. | Supply the matching template; inspect the binary before trusting values. |
-| `no template for field 0x…` | A field symbol has no `-t` template. | Pass both ATP and SDMU templates. |
-| `OUT-OF-RANGE` | Stored value outside template `MINVALUE`/`MAXVALUE`. | Report it; check which side (data or template) is wrong. |
-| Unknown magic / too short | Not a per-class file, or a truncated/concatenated stream. | Split the stream to per-class files first; these tools do not decode the assembled stream. |
+| `CRC MISMATCH` | 存储的 CRC 与覆盖范围内计算出的 CRC 不一致。 | 视为文件损坏/被修改；对照可信来源核实。 |
+| `TEMPLATE/DATA MISMATCH` | 模板版本与数据版本不一致。 | 提供匹配的模板；在信任取值前检查二进制内容。 |
+| `no template for field 0x…` | 某个字段 symbol 没有对应的 `-t` 模板。 | 同时传入 ATP 和 SDMU 模板。 |
+| `OUT-OF-RANGE` | 存储值超出模板 `MINVALUE`/`MAXVALUE`。 | 报告它；检查是数据还是模板一侧有误。 |
+| 未知 magic / 文件过短 | 不是按类拆分的文件，或流被截断/拼接。 | 先把流拆成按类文件；这些工具不反解组装后的流。 |
+
+## 限制
+
+- `crc=OK`/`walk=OK` 不能验证消费端的全部领域约束；相互依赖的取值要按消费端语义检查。
+- 这些工具只处理按类拆分的文件；拼接流及其 8 字节版本尾属于流组装器，不在本流程范围内。

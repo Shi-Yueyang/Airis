@@ -1,69 +1,34 @@
-# Edit — Change Values, Preserve Everything Else
+# 编辑 — 修改取值，其余全部保留
 
-Safely modify values in existing CVC data. The existing files are the source
-of truth: everything except the requested change must survive the round
-trip, verified — never assumed. No new editing script is needed; this
-composes the decoder (`decode.md`) and the serializer (`generate.md`).
+安全地修改既有 CVC 数据中的取值。既有文件是唯一真相源：除了请求的修改之外，所有内容都必须经过校验地存活往返——绝不假设。不需要新的编辑脚本；本流程组合了解码器（`decode.md`）和序列化器（`generate.md`）。
 
-## Rules
+## 规则
 
-1. Never edit or overwrite the source files. Work in a scratch output
-   directory and keep the originals untouched.
-2. Decode the FULL file set (`ASW1.bin`, `Config2.line1`, `Config1.train`)
-   in one dump call. Generation always rewrites all three files from
-   templates + values; a class you did not decode cannot be preserved and
-   would be regenerated from template defaults.
-3. Change only the requested keys in the captured values JSON, keeping the
-   namespaced shape intact.
-4. Verify after regeneration; report the resulting diff explicitly.
-5. Do not touch template files to make an edit succeed, and never widen
-   `MINVALUE`/`MAXVALUE` to force a value through.
+1. 绝不编辑或覆盖源文件。在临时输出目录中工作，保持原始文件不变。
+2. 在一次 dump 调用中反解**完整文件集**（`ASW1.bin`、`Config2.line1`、`Config1.train`）。生成总是由模板 + values 重写全部三个文件；没有反解的类无法保留，会按模板默认值重新生成。
+3. 在捕获的 values JSON 中只修改请求的键，保持命名空间形状不变。
+4. 重新生成后校验；明确报告结果差异。
+5. 不要为了让编辑成功而改动模板文件，也绝不要放宽 `MINVALUE`/`MAXVALUE` 来强行通过某个值。
 
-## Workflow
+## 工作流
 
-Script paths are relative to this skill's folder (see `SKILL.md`); command
-details and all flags live in `decode.md` and `generate.md`.
+脚本路径相对本技能目录（见 `SKILL.md`）；命令细节和所有选项见 `decode.md` 与 `generate.md`。
 
-1. **Decode and capture** — dump all three source files with the matching
-   ATP and SDMU templates, `--values-out scratch/values.json`. Require
-   `crc=OK` and `walk=OK` on every field before editing anything; a
-   mismatching source is stopped on, not "fixed" by editing.
-2. **Edit values** — in `values.json`, change only the requested keys under
-   their correct `class → function` group. Interdependent-value rules from
-   the generator apply: values outside template ranges fail; raising an
-   `N_ITEM_*` count requires list values covering every `([k])` parameter of
-   that group; pinned-array counts are forced to the template's entry count
-   and cannot be edited this way.
-3. **Regenerate** — `gen_cvc_data.py --values scratch/values.json -o
-   scratch/generated` with the same template pair.
-4. **Verify** —
-   - Decode the generated files: `crc=OK`, `walk=OK`, no warnings.
-   - **No-op case** (regenerating without edits, e.g. as a sanity check or
-     to re-frame the same data): outputs must be byte-for-byte identical to
-     the sources.
-   - **Intentional edit**: capture values from the regenerated files with a
-     second `--values-out` and diff against the edited values JSON. The set
-     of differing keys must equal exactly the requested change — no
-     collateral fields, no drift from interdependent defaults. Protocol
-     invariants (CRC, walk, ranges) must hold for all data, changed or not.
-5. **Report** — state source files, templates, which keys changed to what,
-   the verification results (byte equality or the exact value diff), and any
-   check not performed.
+1. **反解并捕获** —— 用匹配的 ATP 与 SDMU 模板 dump 全部三个源文件，`--values-out scratch/values.json`。在编辑任何内容之前，要求每个字段都满足 `crc=OK` 和 `walk=OK`；源不匹配就停下来，不要靠编辑去“修”。
+2. **编辑取值** —— 在 `values.json` 中，只修改正确 `class → function` 分组下的请求键。生成器的相互依赖取值规则同样适用：超出模板范围的取值会失败；提高 `N_ITEM_*` 计数需要为该组中每个 `([k])` 参数提供列表值；固定数组的计数被强制为模板条目数，不能用这种方式编辑。
+3. **重新生成** —— 用同一组模板执行 `gen_cvc_data.py --values scratch/values.json -o scratch/generated`。
+4. **校验** ——
+   - 反解生成的文件：`crc=OK`、`walk=OK`、无告警。
+   - **无改动场景**（不做编辑直接重新生成，例如作为健全性检查或对同一数据重新组帧）：输出必须与源文件逐字节相同。
+   - **有意的编辑**：用第二次 `--values-out` 从生成的文件中捕获取值，并与编辑后的 values JSON 做差异比较。差异键集合必须恰好等于请求的修改——没有附带字段，也没有因相互依赖默认值产生的漂移。无论是否改动，所有数据都必须满足协议不变量（CRC、walk、范围）。
+5. **报告** —— 说明源文件、模板、哪些键改成了什么值、校验结果（字节相等或确切的值差异），以及任何未执行的检查。
 
-## Failure handling
+## 失败处理
 
-- Source decode warns (`CRC MISMATCH`, `TEMPLATE/DATA MISMATCH`,
-  out-of-range): stop; the source is corrupt or the templates are the wrong
-  revision. Do not regenerate over data you cannot fully explain.
-- Generation fails (un-namespaced key, stale key, out-of-range value): fix
-  the values file; the generator writes nothing on these errors, so no
-  partial output can mislead.
-- Verification diff shows unexpected fields changed: treat as failure — the
-  edit touched interdependent values (counts, divisor defaults) or used a
-  values file from a different template revision. Re-capture and retry.
+- 源反解告警（`CRC MISMATCH`、`TEMPLATE/DATA MISMATCH`、越界）：停止；源已损坏，或模板版本不对。不要在你无法完全解释的数据上重新生成。
+- 生成失败（未带命名空间的键、过期键、越界值）：修正 values 文件；生成器在这些错误下不写任何内容，因此不会有部分输出造成误导。
+- 校验差异显示有意外字段变化：视为失败——编辑触及了相互依赖的取值（计数、除数默认值），或使用了不同模板版本的 values 文件。重新捕获并重试。
 
-## Limits
+## 限制
 
-Shared with the generator: consumer-side domain semantics are not validated
-by the tools, and the concatenated-stream version tail is out of scope — see
-`references/protocol.md` and `generate.md`.
+与生成器相同：工具不验证消费端领域语义，拼接流的版本尾也不在范围内——见 `references/protocol.md` 和 `generate.md`。

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Airis 是一个 OpenCode **应用包**（对话型智能体），不是可执行程序。唯一交付物是 `airis-<version>.opapp.tgz`，内容只有 `manifest.json` + `.opencode/`。仓库没有构建系统、没有测试框架、没有 CI —— 唯一的机器校验是下面的打包校验脚本。
+Airis 是一个公司比赛参赛作品，参赛报名表为`registration.md`。Airis是一个OpenCode **应用包**（对话型智能体），不是可执行程序。唯一交付物是 `airis-<version>.opapp.tgz`，内容只有 `manifest.json` + `.opencode/`。仓库没唯一的机器校验是下面的打包校验脚本。仓库中的Agent和skill会统一发布，skill不会单独使用
 
 ## 真实边界
 
@@ -29,8 +29,6 @@ python .\.opencode\skills\package-and-validate\scripts\build_opapp_tgz.py .
 
 ## 当前已知的坑
 
-- `tacn-rbc-data` 已接线：`SKILL.md` + `decode.md` / `generate.md` / `edit.md` + `references/protocol.md`
-  （含附录 B 源文档歧义、附录 C 编解码约定）+ `scripts/` 四个文件（`rbc_spec.py` 是共享的报文定义与位打包引擎）。
 - RBC 报文没有 CRC，仓库里也没有真机样本：`selftest_rbc_msg.py`（53 项）只能证明长度/包长/位遍历/组成自洽。
   改动 `rbc_spec.py` 后先跑它，再跑反解报告核对，不要只看"生成成功"。
 - `agents/airis.md` 现在只把平台配置、应答器轨旁报文列为未启用（TACN RBC 已启用），改动时别把两边写反。
@@ -56,4 +54,4 @@ python .\.opencode\skills\package-and-validate\scripts\build_opapp_tgz.py .
 
 ## 语言
 
-面向平台与用户的文本（`manifest.json`、README、agent 提示词、脚本报错）用简体中文；`cvc-data` 的技能文档用英文，`tacn-rbc-data` 的技能文档用中文（`references/protocol.md` 本身是中文协议摘录）。改文件时跟随该文件已有语言，不要混译。
+面向平台与用户的文本（`manifest.json`、README、agent 提示词、脚本报错）用简体中文；`cvc-data` 与 `tacn-rbc-data` 的技能文档用中文（`tacn-rbc-data/references/protocol.md` 本身是中文协议摘录）。改文件时跟随该文件已有语言，不要混译。

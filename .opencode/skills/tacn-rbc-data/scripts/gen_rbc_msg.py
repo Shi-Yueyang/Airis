@@ -405,9 +405,6 @@ def main(argv=None):
             print("    %s: %s（%s）" % (name, got, verdict))
         for warning in result["warnings"]:
             print("    警告: %s" % warning, file=sys.stderr)
-        if any(user == 152 for _nid, user in result["metas"]):
-            print("    注意: 协议标注 CTCS-152 的 L_PACKET=118，与其字段表（240 bit）冲突；"
-                  "本实现按字段表，联调需核实", file=sys.stderr)
         if args.verbose:
             for row in result["rows"]:
                 if row["omitted"]:
