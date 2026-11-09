@@ -1,7 +1,7 @@
 # Airis 铁路测试数据智能体
 
 - **app_id**: `airis`
-- **版本**: 1.3.0
+- **版本**: 1.4.0
 - **类型**: 对话型应用
 - **用途**: 面向铁路产品研发与测试人员，用自然语言驱动测试数据的反解、生成、定点修改与校验。
 
@@ -37,6 +37,13 @@
         │       ├── gen_rbc_msg.py
         │       ├── dump_rbc_msg.py
         │       └── selftest_rbc_msg.py
+        ├── smartcore-plug/           # 应用能力：SmartCore 配置 xls → ctcs 生成
+        │   ├── SKILL.md
+        │   ├── references/
+        │   │   └── format.md
+        │   └── scripts/
+        │       ├── gen_ctcs.py
+        │       └── selftest_ctcs.py
         └── package-and-validate/     # 开发工具：校验 + 打包（不随发布包分发）
             ├── SKILL.md
             ├── references/dev-studio-path-map.md
