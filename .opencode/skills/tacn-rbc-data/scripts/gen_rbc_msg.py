@@ -4,10 +4,13 @@
 报文结构来自本技能 references/protocol.md，脚本不含任何外部模板；输入是一份按报文分组的
 取值 JSON，输出是可直接粘贴进测试仪器/监视工具的 hex 文本（默认一行大写、无分隔）。
 
-取值 JSON 的形状（键写法与 protocol.md 一致）：
+取值 JSON 的形状（键写法与 protocol.md 一致；intent/provenance 是生成门禁，缺一不可）：
 
     {
       "M3": {
+        "intent": {"message": "M3", "target": "both",
+                   "packets": ["P15", "P44/CTCS-150"], "confirmed": true},
+        "provenance": {"header": "user", "P15": "user", "P44/CTCS-150": "user"},
         "header": {"T_TRAIN": 34655, "NID_LRBG": 16681259},
         "packets": [
           {"packet": "P15", "fields": {"Q_SCALE": 1, "L_ENDSECTION": 3000}},
@@ -15,6 +18,12 @@
         ]
       }
     }
+
+  * intent 必须由用户确认后手写：confirmed=true；target 为 hex / sim-xml / both；
+    packets 必须与实际包顺序完全一致；声明不符、缺 confirmed 都会直接失败。
+  * provenance 给每个报文段标注来源：user（用户给的）、decoded（反解导出）、
+    placeholder（占位/示例值）。值可以是段级字符串，也可以是 {字段: 来源} 对象。
+    含 placeholder 时必须显式加 --allow-placeholder，否则不生成任何文件。
 
   * 顶层每个键生成一个 .hex 文件；键名就是报文标签（M3/M24/…），也可以用
     {"ma_523": {"message": "M3", ...}} 让文件名与报文类型分开。
@@ -102,7 +111,7 @@ def apply_set(doc, spec):
         if len(rest) != 2:
             raise CliError("--set %r：报文头字段路径应为 <分组>.header.<字段>" % spec)
         body.setdefault("header", {})[rest[1]] = value
-        return
+        return set_path(group, "header", rest[1])
     match = re.match(r"^(P\d+|CTCS-\d+)(?:\[(\d+)\])?$", rest[0])
     if not match:
         raise CliError("--set %r：%r 不是 P15 / P44 / CTCS-150 这样的包标识"
@@ -110,6 +119,11 @@ def apply_set(doc, spec):
     label = match.group(1)
     index = int(match.group(2)) if match.group(2) else None
     packets = locate_packets(body)
+    if label.upper() == "P44" and len(rest) == 3 \
+            and str(rest[1]).upper().startswith("CTCS-"):
+        # <分组>.P44.CTCS-150.<字段>
+        label = str(rest[1]).upper()
+        rest = ["P44", label, rest[2]]
     if label.startswith("CTCS-"):
         # <分组>.P44.CTCS-150.<字段>
         if len(rest) != 3:
@@ -120,9 +134,9 @@ def apply_set(doc, spec):
             if str(entry.get("packet", "")).upper() == "P44" \
                     and str(entry.get("user", "")).upper() == user:
                 entry.setdefault("fields", {})[field] = value
-                return
+                return set_path(group, "P44/%s" % user, field)
         packets.append({"packet": "P44", "user": user, "fields": {field: value}})
-        return
+        return set_path(group, "P44/%s" % user, field)
     if len(rest) != 2:
         raise CliError("--set %r：信息包字段路径应为 <分组>.<信息包>.<字段>" % spec)
     field = rest[1]
@@ -132,11 +146,17 @@ def apply_set(doc, spec):
             seen += 1
             if index is None or seen == index:
                 entry.setdefault("fields", {})[field] = value
-                return
+                return set_path(group, "P%d" % int(label[1:]), field)
     if index is not None:
         raise CliError("--set %r：第 %d 个 %s 不存在（报文里只有 %d 个）"
                        % (spec, index, label, seen))
     packets.append({"packet": label, "fields": {field: value}})
+    return set_path(group, "P%d" % int(label[1:]), field)
+
+
+def set_path(group, section, field):
+    """--set 覆盖路径的规范形式，用于把被覆盖字段记为 user 来源。"""
+    return "%s.%s.%s" % (group, section, re.split(r"[#(]", str(field))[0])
 
 
 def safe_name(label):
@@ -155,7 +175,208 @@ def read_values(path):
         raise CliError("values 文件不是合法 JSON（%s）：%s" % (path, exc))
     if not isinstance(doc, dict):
         raise CliError("values 文件的顶层必须是 {报文分组: {...}}")
+    for reserved in ("intent", "provenance"):
+        if reserved in doc:
+            raise CliError("intent/provenance 必须写在报文分组里（例如 doc[\"M3\"][\"intent\"]），"
+                           "不能放在顶层；%r 会被当成报文分组" % reserved)
     return doc
+
+
+# ---------------------------------------------------------------------------
+# 生成门禁：intent + provenance
+# ---------------------------------------------------------------------------
+GATE_HINT = "生成门禁见 references/gate.md；确认单未填完不得生成。"
+SOURCE_VALUES = ("user", "decoded", "placeholder")
+TARGETS = ("hex", "sim-xml", "both")
+
+
+def packet_code(spec, user_spec=None):
+    """信息包段标识：P15 / P44/CTCS-150。intent.packets 与 provenance 都用它。"""
+    if spec.get("nid") == 44:
+        return "P44/CTCS-%d" % user_spec["nid"]
+    return "P%d" % spec["nid"]
+
+
+def normalize_message(value):
+    text = str(value).strip().upper()
+    match = re.match(r"^M(\d+)$", text)
+    if match:
+        return "M%d" % int(match.group(1))
+    match = re.match(r"^(\d+)$", text)
+    if match:
+        return "M%d" % int(match.group(1))
+    return text
+
+
+def normalize_packet(value):
+    text = str(value).strip().upper().replace(" ", "")
+    if text.startswith("CTCS-"):
+        return "P44/" + text
+    if text.startswith("P44/"):
+        return text
+    match = re.match(r"^P(\d+)$", text)
+    if match:
+        return "P%d" % int(match.group(1))
+    return text
+
+
+def base_field(name):
+    return re.split(r"[#(]", str(name))[0]
+
+
+def section_rule(prov, section):
+    if section in prov:
+        return prov[section], section
+    if section.startswith("P44/") and "P44" in prov:
+        return prov["P44"], "P44"
+    if "*" in prov:
+        return prov["*"], "*"
+    return None, section
+
+
+def field_source(rule, key, field):
+    if isinstance(rule, str):
+        return rule, key
+    if not isinstance(rule, dict):
+        return "<非法来源>", key
+    if field in rule:
+        return rule[field], key + "." + field
+    base = base_field(field)
+    if base in rule:
+        return rule[base], key + "." + base
+    if "*" in rule:
+        return rule["*"], key + ".*"
+    return None, key
+
+
+def _overridden(overrides, label, section, field):
+    return set_path(label, section, field) in overrides
+
+
+def check_gate(label, body, msg, entries, target, overrides, allow_placeholder):
+    """校验 intent/provenance；不通过就抛错，一个文件都不写。
+
+    返回审计统计：{counts: {user/decoded/placeholder}, placeholders: [(段, 字段)]}。
+    """
+    problems = []
+    intent = body.get("intent")
+    if not isinstance(intent, dict):
+        problems.append("缺少 intent：先按 references/gate.md 的确认单写 "
+                        "intent{message,target,packets,confirmed}")
+    else:
+        if intent.get("confirmed") is not True:
+            problems.append("intent.confirmed 不是 true：需求确认单尚未完成，不得生成")
+        declared_target = intent.get("target")
+        if declared_target not in TARGETS:
+            problems.append("intent.target 必须是 %s，收到 %r"
+                            % ("/".join(TARGETS), declared_target))
+        elif declared_target != "both" and declared_target != target:
+            problems.append("这份取值标的是 %s，不能用来生成 %s；"
+                            "要两种产物都生成请写 \"target\": \"both\""
+                            % (declared_target, target))
+        declared_msg = normalize_message(intent.get("message", ""))
+        actual_msg = "M%d" % msg["nid"]
+        if declared_msg != actual_msg:
+            problems.append("intent.message 声明 %r，实际分组是 %s"
+                            % (intent.get("message"), actual_msg))
+        declared = intent.get("packets")
+        actual = [packet_code(spec, user_spec) for spec, user_spec, _fields in entries]
+        if not isinstance(declared, list):
+            problems.append("intent.packets 必须是数组（无信息包写 []），收到 %r" % (declared,))
+        else:
+            got = [normalize_packet(item) for item in declared]
+            if got != actual:
+                problems.append("intent.packets 声明 %s，实际包顺序是 %s；"
+                                "组成不一致不得生成" % (got, actual))
+
+    counts = {"user": 0, "decoded": 0, "placeholder": 0}
+    placeholders = []
+    prov = body.get("provenance")
+    if not isinstance(prov, dict):
+        problems.append("缺少 provenance：逐段标注来源 user/decoded/placeholder")
+        prov = {}
+
+    merged = []
+    index = {}
+    if isinstance(body.get("header"), dict) and body["header"]:
+        merged.append(["header", list(body["header"].keys())])
+        index["header"] = 0
+    for spec, user_spec, fields in entries:
+        section = packet_code(spec, user_spec)
+        if section not in index:
+            index[section] = len(merged)
+            merged.append([section, []])
+        for name in fields:
+            if name not in merged[index[section]][1]:
+                merged[index[section]][1].append(name)
+
+    known = set(name for name, _fields in merged) | {"*"}
+    if any(name.startswith("P44/") for name, _fields in merged):
+        known.add("P44")
+    for key in sorted(prov):
+        if key not in known:
+            problems.append("provenance 键 %r 没有对应的报文段（可用：%s）"
+                            % (key, "、".join(sorted(known))))
+
+    for section, fields in merged:
+        rule, key = section_rule(prov, section)
+        if rule is None:
+            if fields and all(_overridden(overrides, label, section, f) for f in fields):
+                rule, key = "user", "(--set)"
+            else:
+                problems.append("provenance 缺少 %r 段：写 \"%s\": \"user\"（或 "
+                                "\"decoded\"/\"placeholder\"）" % (section, section))
+                continue
+        if isinstance(rule, str):
+            if rule not in SOURCE_VALUES:
+                problems.append("provenance.%s 的来源 %r 不合法（只能是 %s）"
+                                % (key, rule, "/".join(SOURCE_VALUES)))
+                continue
+            for name in fields:
+                source = "user" if _overridden(overrides, label, section, name) else rule
+                counts[source] += 1
+                if source == "placeholder":
+                    placeholders.append((section, name))
+            continue
+        if not isinstance(rule, dict):
+            problems.append("provenance.%s 必须是来源字符串或 {字段: 来源} 对象" % key)
+            continue
+        for name in rule:
+            if name == "*":
+                continue
+            if name not in fields and base_field(name) not in [base_field(f) for f in fields]:
+                problems.append("provenance.%s 里的字段 %r 不在该段取值里" % (key, name))
+        for name in fields:
+            source, _where = field_source(rule, key, name)
+            if _overridden(overrides, label, section, name):
+                source = "user"
+            if source is None:
+                problems.append("provenance.%s 没有给字段 %r 标注来源" % (key, name))
+                continue
+            if source not in SOURCE_VALUES:
+                problems.append("provenance.%s.%s 的来源 %r 不合法（只能是 %s）"
+                                % (key, name, source, "/".join(SOURCE_VALUES)))
+                continue
+            counts[source] += 1
+            if source == "placeholder":
+                placeholders.append((section, name))
+
+    if placeholders and not allow_placeholder:
+        listed = "、".join("%s.%s" % (section, name) for section, name in placeholders)
+        problems.append("有 %d 个占位字段（%s）；确认可用占位值后加 --allow-placeholder，"
+                        "否则请补真实取值" % (len(placeholders), listed))
+    if problems:
+        raise S.SpecError("\n".join(["生成门禁未通过（%s）：" % label]
+                                    + ["- %s" % text for text in problems]
+                                    + [GATE_HINT]))
+    return {"counts": counts, "placeholders": placeholders}
+
+
+def audit_line(gate, fallbacks):
+    counts = gate["counts"]
+    text = "审计: 用户 %d / 解码 %d / 占位 %d / 协议默认 %d" % (
+        counts["user"], counts["decoded"], counts["placeholder"], fallbacks)
+    return text
 
 
 def hex_text(data, style, per_line):
@@ -242,10 +463,11 @@ def _describe_packets(msg):
 
 
 def _describe_skeleton(msg):
-    """给出可直接改值的 header 骨架；packets 留空，由使用者按组成表补。"""
+    """给出 values 的形状；值一律写 <待确认>，直接复制会触发门禁失败。"""
     header = {}
     seen = set()
     items = (S.HEADER_G2T if msg["dir"] == S.G2T else S.HEADER_T2G) + msg["pre"]
+    pending = "<待确认>"
     for item in items:
         if item.get("role") in ("nid_message", "l_message"):
             continue
@@ -254,7 +476,7 @@ def _describe_skeleton(msg):
             if comp in seen:
                 continue
             seen.add(comp)
-            header[comp] = 0
+            header[comp] = pending
             continue
         name = item.get("name")
         if name in seen:
@@ -263,11 +485,14 @@ def _describe_skeleton(msg):
                 suffix += 1
             name = "%s#%d" % (name, suffix)
         seen.add(name)
-        dflt = item.get("dflt", item.get("lo", 0))
-        if item.get("sent") is not None and item.get("sent") == dflt:
-            dflt = 0  # 哨兵只作占位，避免骨架看起来像真实值
-        header[name] = dflt
-    body = {"message": "M%d" % msg["nid"], "header": header, "packets": []}
+        header[name] = pending
+    body = {
+        "intent": {"message": "M%d" % msg["nid"], "target": "both",
+                   "packets": [pending], "confirmed": False},
+        "provenance": {"header": pending, "*": pending},
+        "header": header,
+        "packets": [],
+    }
     return {"M%d" % msg["nid"]: body}
 
 
@@ -305,7 +530,8 @@ def describe_message(label, out=None):
         for qualifier, text in packets:
             print("  - %s：%s" % (qualifier, text), file=out)
 
-    print("\nvalues 骨架（示例值需替换；packets 按上面的组成表补）：", file=out)
+    print("\nvalues 骨架（不可直接生成：先把 <待确认> 换成用户确认值，"
+          "并填 intent/provenance；见 references/gate.md）：", file=out)
     print(json.dumps(_describe_skeleton(msg), ensure_ascii=False, separators=(",", ":")), file=out)
     return 0
 
@@ -328,6 +554,8 @@ def main(argv=None):
     ap.add_argument("--set", action="append", metavar="PATH=VALUE",
                     help="临时覆盖：M3.header.NID_BG=523 / M3.P15.L_ENDSECTION=3000 / "
                          "M3.P44.CTCS-150.NID_ENGINE=90；逗号分隔表示列表")
+    ap.add_argument("--allow-placeholder", action="store_true",
+                    help="允许 provenance 标为 placeholder 的占位/示例值；不加则拒绝生成")
     ap.add_argument("--hex-style", choices=("plain", "spaced", "lines"), default="plain",
                     help="hex 排版：plain 一行连续（默认）、spaced 每字节空格、lines 每行若干字节")
     ap.add_argument("--hex-per-line", type=int, default=16, help="--hex-style lines 时每行字节数")
@@ -352,8 +580,9 @@ def main(argv=None):
     options = {"p72_charset": args.p72_charset, "ctcs132_sig_bits": args.ctcs132_sig_bits}
     try:
         doc = read_values(args.values)
+        overrides = set()
         for spec in args.set or []:
-            apply_set(doc, spec)
+            overrides.add(apply_set(doc, spec))
 
         selected = [m.strip().upper() for m in args.message or []]
         groups = []
@@ -369,8 +598,10 @@ def main(argv=None):
             if not isinstance(body, dict):
                 raise CliError("分组 %r 必须是对象" % label)
             msg, header, entries = S.values_for_message(body, label)
+            gate = check_gate(label, body, msg, entries, "hex",
+                              overrides, args.allow_placeholder)
             result = S.encode_message(msg, header, entries, options)
-            prepared.append((label, msg, result))
+            prepared.append((label, msg, result, gate))
     except S.SpecError as exc:
         print("错误: %s" % exc, file=sys.stderr)
         return 1
@@ -384,7 +615,7 @@ def main(argv=None):
     used = {}
     written = []
     fallback_total = 0
-    for label, msg, result in prepared:
+    for label, msg, result, gate in prepared:
         base = safe_name(label)
         count = used.get(base, 0) + 1
         used[base] = count
@@ -403,6 +634,9 @@ def main(argv=None):
         print("    hex: %s" % result["data"].hex().upper())
         for name, got, verdict in result["checks"]:
             print("    %s: %s（%s）" % (name, got, verdict))
+        print("    %s" % audit_line(gate, result["fallbacks"]))
+        for section, field in gate["placeholders"]:
+            print("    占位: %s.%s" % (section, field))
         for warning in result["warnings"]:
             print("    警告: %s" % warning, file=sys.stderr)
         if args.verbose:

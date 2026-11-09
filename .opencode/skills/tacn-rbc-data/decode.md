@@ -33,7 +33,7 @@
    python <skill-dir>/scripts/dump_rbc_msg.py m3.hex --values-out values.json -o report.md
    ```
 
-   `-o` 把 Markdown 报告写入文件；不给则输出到 stdout。`--values-out` 是"定点修改"的捕获步骤（`edit.md`）：它把整条报文（含所有已解出的字段）写成 `gen_rbc_msg.py --values` 能直接吃的 JSON；默认不用它，反解的交付物就是报告。
+   `-o` 把 Markdown 报告写入文件；不给则输出到 stdout。`--values-out` 是"定点修改"的捕获步骤（`edit.md`）：它把整条报文（含所有已解出的字段）写成 `gen_rbc_msg.py --values` 能直接吃的 JSON，并自动带上门禁块（`intent` 与全 `decoded` 的 `provenance`）；默认不用它，反解的交付物就是报告。
 
    | 选项 | 用途 |
    |---|---|

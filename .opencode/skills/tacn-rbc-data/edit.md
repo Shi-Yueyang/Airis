@@ -2,7 +2,7 @@
 
 已有报文是唯一事实来源：除了要求改的字段，其它一切都要**经过验证**地保持不变。不需要第三个脚本：这就是"反解 → 改取值 → 重新生成 → 再反解对比"的组合。
 
-开始前先对齐：要改哪些字段、改成什么值、产物目录与文件名、是否允许覆盖已有文件。用户没说清就先问，清单见 `SKILL.md` 的「需要用户澄清的要点」。
+开始前先对齐：要改哪些字段、改成什么值、产物目录与文件名、是否允许覆盖已有文件。用户没说清就先问，按 `SKILL.md` 的确认单与 `references/gate.md` 执行，不得跳过门禁。
 
 ## 规则
 
@@ -24,6 +24,9 @@
 
    在编辑任何内容之前，先按 `decode.md` 的「判定是否可信」检查 `before_report.md`；源报文不可靠就停下来，不要靠修改去"修"。
 2. **编辑取值** — 在 `before.json` 里只改正确报文/信息包分组下的目标键，另存为 `edited.json`（保留原文件）。例：把 M3 的 `L_ENDSECTION` 从 3000 改成 2500，就只把 `"L_ENDSECTION": 3000` 改成 `"L_ENDSECTION": 2500`。
+   导出的文件自带 `intent`（`target=both`、`confirmed=true`）和 `provenance`（全部 `decoded`）；
+   改了哪个段就把该段来源改成 `"user"`，否则审计行会把用户改动误记为反解值。门禁格式见
+   `references/gate.md`。
 3. **重新生成** — 用同一份取值重新生成：
 
    ```sh
@@ -44,6 +47,8 @@
    def flat(doc, prefix=""):
        out = {}
        for key, value in doc.items():
+           if key in ("intent", "provenance"):
+               continue
            if isinstance(value, dict):
                out.update(flat(value, prefix + key + "."))
            elif isinstance(value, list):
@@ -73,7 +78,8 @@
 | 现象 | 原因 | 处理 |
 |---|---|---|
 | 原报文反解就有错误 | 报文被截断/来自别的版本/缺定义 | 先解决反解问题，不要在坏数据上改 |
-| 生成时报"没有被消费的键" | 键名拼错，或这个字段不在该包里 | 按 `decode.md` 报告里的字段名改 |
+| 生成时报"没有被消费的键" | 键名拼错，或这个字段不在该包里；也可能把 `intent`/`provenance` 放到了顶层 | 按 `decode.md` 报告里的字段名改；门禁块必须在报文分组里 |
+| 生成时报"生成门禁未通过" | 缺 `intent`/`provenance`、包顺序改了没同步、或改了字段没把来源改成 `user` | 按 `references/gate.md` 修正；不要用 `--allow-placeholder` 绕过真实取值问题 |
 | 生成时报定长不符（P3/P58/P65/P4/CTCS-136） | 改了会影响包长的计数 | 这些包是定长的，计数不能改 |
 | 差异里多出 `N_ITER` 或列表长度 | 改了迭代轮数 | 正常，但要确认每一轮都给齐了 |
 | 差异里多出没改过的字段 | 取值没导全/默认值不一致/条件字段联动 | 重新完整反解后重做，不要手工补 |

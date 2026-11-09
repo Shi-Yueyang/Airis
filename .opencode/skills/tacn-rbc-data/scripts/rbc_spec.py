@@ -1890,6 +1890,7 @@ def capture_message(result):
         _store(buckets[row["fid"]], row)
     header = buckets.get(0, {})
     packets = []
+    codes = []
     metas = result.get("metas") or []
     for fid in order:
         if fid == 0:
@@ -1901,9 +1902,18 @@ def capture_message(result):
         if user is not None:
             entry["packet"] = "P44"
             entry["user"] = "CTCS-%d" % user
+            codes.append("P44/CTCS-%d" % user)
+        else:
+            codes.append("P%d" % nid)
         entry["fields"] = buckets[fid]
         packets.append(entry)
-    return {"header": header, "packets": packets}
+    return {
+        "intent": {"message": "M%d" % msg["nid"], "target": "both",
+                   "packets": codes, "confirmed": True},
+        "provenance": {"header": "decoded", "*": "decoded"},
+        "header": header,
+        "packets": packets,
+    }
 
 
 
