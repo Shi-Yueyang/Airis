@@ -1,71 +1,45 @@
 ---
 name: cvc-data
-description: "Decodes, generates, edits, and verifies CVC application data files (ASW1.bin, Config2.line1, Config1.train) using their ATP and SDMU template XMLs, with field-walk reports and round-trip checks. Use for any inspect, audit, generate, edit, or verify task on these files, and for interpreting decoder warnings such as CRC MISMATCH, OUT-OF-RANGE, or TEMPLATE/DATA MISMATCH."
+description: "使用 ATP 与 SDMU 模板 XML 反解、生成、编辑和校验 CVC 应用数据文件（ASW1.bin、Config2.line1、Config1.train），输出字段遍历报告并做往返校验。适用于这些文件的任何检查、审计、生成、编辑或校验任务，也用于解释 CRC MISMATCH、OUT-OF-RANGE、TEMPLATE/DATA MISMATCH 等解码告警。"
 ---
 
-# CVC Data
+# CVC 数据
 
-Decode, generate, and edit CVC application-data binaries with the bundled
-scripts.
+使用随技能提供的脚本反解、生成和编辑 CVC 应用数据二进制文件。
 
-## How to use this skill
+## 如何使用本技能
 
-Read the doc that matches the task, then follow it. Each phase doc is
-complete on its own for its task:
+按任务读取对应文档，然后照做。每份阶段文档对本阶段任务都是完整的：
 
-| Task | Read |
+| 任务 | 读 |
 |---|---|
-| Inspect/audit a data file, interpret warnings, capture values | `decode.md` |
-| Produce data files from templates (values JSON required; `--set` for one-offs) | `generate.md` |
-| Change specific values in existing files, preserve everything else | `edit.md` |
-| Wire-format questions (framing, magics per DIST class, field order) | `references/protocol.md` |
-| Anything chaining the above; verification and reporting | the relevant phase docs + the discipline below |
+| 检查/审计数据文件、解释告警、捕获取值 | `decode.md` |
+| 由模板生成数据文件（必须提供 values JSON；一次性覆盖用 `--set`） | `generate.md` |
+| 修改既有文件中的指定取值，其余保持不变 | `edit.md` |
+| 线格式问题（帧结构、各 DIST 类的 magic、字段顺序） | `references/protocol.md` |
+| 串联上述步骤；校验与报告 | 对应阶段文档 + 下面的纪律 |
 
 
-## Prerequisites
+## 前置条件
 
-- Python 3 (standard library only). The scripts process local files only:
-  no external processes, no network.
-- The matching ATP and SDMU template XMLs. Both are always required: the
-  reference frame carries both application fields, in canonical ATP→SDMU
-  order, regardless of command-line order.
-- For decode or round-trip work, the source data files.
-- For generation, a values JSON — `--values` is required on every run; bare
-  template-default generation is rejected, so no run can silently be a
-  defaults run.
-- For generation, a writable scratch output directory that does not contain
-  source files to preserve — generation overwrites conventional filenames
-  (`ASW1.bin`, `Config2.line1`, `Config1.train`) in the target directory,
-  and every run writes all three.
+- Python 3（仅标准库）。脚本只处理本地文件：不调用外部进程，不访问网络。
+- 匹配的 ATP 与 SDMU 模板 XML。两者始终都必须提供：参考帧同时携带两个应用字段，按固定的 ATP→SDMU 顺序，与命令行顺序无关。
+- 反解或往返工作还需要源数据文件。
+- 生成需要一份 values JSON —— 每次运行都必须给 `--values`；裸模板默认值生成会被拒绝，因此不会有任何一次运行悄悄变成默认值运行。
+- 生成需要一个可写的临时输出目录，且其中不能有要保留的源文件 —— 生成会覆盖目标目录里的常规文件名（`ASW1.bin`、`Config2.line1`、`Config1.train`），而且每次运行都会写全部三个文件。
 
-## Verification and reporting discipline
+## 校验与报告纪律
 
 
-- **No reliance before decode output is clean** — every `CRC MISMATCH`,
-  `TEMPLATE/DATA MISMATCH`, out-of-range, unknown-field, and
-  unaccounted-byte warning is resolved or explained before decoded data is
-  used (`decode.md`).
-- **No completion claim before verify** — every generated or edited file is
-  re-decoded with the same templates; require `crc=OK` and `walk=OK` for
-  both fields in every file. Reproduction of a known dataset: byte-for-byte
-  equality with the references. Intentional edits: exact requested-key diff
-  and unchanged unrelated values (`edit.md`). A successful exit code is not
-  proof of correct data.
-- **Values must come from the matching template revision** — stale keys and
-  out-of-range values are rejected before any file is written.
-- **The report is the evidence** — templates and values file used, output
-  directory, CRC and field-walk results, byte-comparison or edit-diff
-  result, and any warnings or checks not performed.
+- **反解输出干净之前不得依赖** —— 在解码数据被使用前，每一条 `CRC MISMATCH`、`TEMPLATE/DATA MISMATCH`、越界、未知字段和未计入字节告警都必须解决或解释清楚（`decode.md`）。
+- **校验之前不得声称完成** —— 每个生成或编辑过的文件都要用同一组模板重新反解；要求每个文件的每个字段都满足 `crc=OK` 和 `walk=OK`。复现已知数据集：与参考文件逐字节相等。有意的编辑：差异必须恰好是请求修改的键，未涉及的值保持不变（`edit.md`）。退出码成功不等于数据正确。
+- **取值必须来自匹配的模板版本** —— 过期键和越界值会在写任何文件之前被拒绝。
+- **报告就是证据** —— 写清使用的模板和 values 文件、输出目录、CRC 与字段遍历结果、字节比较或编辑差异结果，以及任何告警或未执行的检查。
 
-Chained tasks (reproducing or editing a dataset) just run the phases in
-order — decode, generate, verify — each governed by the doc the table
-routes it to.
+串联任务（复现或编辑数据集）按顺序执行各阶段——反解、生成、校验——每个阶段都由路由表指向的文档约束。
 
-## Standing limitations
+## 固有限制
 
-- `crc=OK`/`walk=OK` do not validate every consumer-side domain constraint;
-  check interdependent values against the consumer's semantics.
-- The tools handle per-class files only; the concatenated stream and its
-  8-byte version tail belong to the stream assembler.
-- Values files must be namespaced and fully consumed; details and failure
-  messages live in `generate.md`.
+- `crc=OK`/`walk=OK` 不能验证消费端的全部领域约束；相互依赖的取值要按消费端语义检查。
+- 这些工具只处理按类拆分的文件；拼接流及其 8 字节版本尾属于流组装器。
+- values 文件必须带命名空间并被完整消费；细节和失败信息见 `generate.md`。

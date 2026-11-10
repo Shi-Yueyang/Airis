@@ -1,7 +1,7 @@
 # Airis 铁路测试数据智能体
 
 - **app_id**: `airis`
-- **版本**: 1.4.0
+- **版本**: 1.3.3
 - **类型**: 对话型应用
 - **用途**: 面向铁路产品研发与测试人员，用自然语言驱动测试数据的反解、生成、定点修改与校验。
 
@@ -25,25 +25,23 @@
         │   └── scripts/
         │       ├── dump_cvc_data.py
         │       └── gen_cvc_data.py
-        ├── tacn-rbc-data/            # 应用能力：TACN 车地无线报文生成 / 反解 / 定点修改
+        ├── tacn-rbc-data/            # 应用能力：TACN 车地无线报文生成 / 反解 / 定点修改 / 模拟器输入
         │   ├── SKILL.md
         │   ├── decode.md
         │   ├── generate.md
+        │   ├── sim-xml.md
         │   ├── edit.md
         │   ├── references/
-        │   │   └── protocol.md
+        │   │   ├── protocol.md
+        │   │   └── rbc-simulator-input-xml.md
         │   └── scripts/
-        │       ├── rbc_spec.py       # 报文定义 + 位打包引擎（两个 CLI 共用）
+        │       ├── rbc_spec.py       # 报文定义 + 位打包引擎（CLI 共用）
         │       ├── gen_rbc_msg.py
         │       ├── dump_rbc_msg.py
-        │       └── selftest_rbc_msg.py
-        ├── smartcore-plug/           # 应用能力：SmartCore 配置 xls → ctcs 生成
-        │   ├── SKILL.md
-        │   ├── references/
-        │   │   └── format.md
-        │   └── scripts/
-        │       ├── gen_ctcs.py
-        │       └── selftest_ctcs.py
+        │       ├── sim_spec.py       # 模拟器 XML 行渲染与长度重算
+        │       ├── gen_rbc_sim_xml.py
+        │       ├── selftest_rbc_msg.py
+        │       └── selftest_sim_xml.py
         └── package-and-validate/     # 开发工具：校验 + 打包（不随发布包分发）
             ├── SKILL.md
             ├── references/dev-studio-path-map.md
@@ -93,16 +91,26 @@ opencode
 - 生成：按取值 JSON 输出 hex 报文串，覆盖地→车 M2/M3/M6/M8/M15/M16/M18/M24/M32/M34/M39/M41/M45，
   车→地 M129/M132/M136/M146/M147/M149/M150/M154~M159，P0~P80 信息包与 P44 内
   CTCS-51/54/80~84/131/132/136/150/151/152 用户包。
+- 模拟器输入：把同一份取值 JSON 渲染成 RBC 模拟器的 `DataTable` XML（RBC→车，UTF-8 BOM，
+  行序即线序，自动回填 `L_MESSAGE`/`L_PACKET`）；只支持模拟器分派表内的消息/信息包/用户包，
+  生成后按 `rbc-simulator-input-xml.md` 第 7 节的长度基线校验。
 - 反解：hex 文本或原始二进制 → Markdown 字段报告（起始位/位宽/取值/含义），并给出
   `L_MESSAGE`、包内 `L_PACKET`、位遍历闭合、填充位、组成规则的自洽结论。
 - 定点修改：反解导出取值 → 只改目标键 → 重新生成 → 再反解并做键级差异对比。
+- 生成门禁：取值 JSON 每个分组必须带 `intent`（确认消息/产物/包顺序/`confirmed=true`）与
+  `provenance`（逐段来源 user/decoded/placeholder）；缺确认、包顺序不符、来源未标注或占位值
+  未加 `--allow-placeholder` 时生成器 exit 1，不写任何文件。
 - 生成侧硬校验：协议定长包、500 字节上限、必选包与组成表、方向、条件字段、取值越界、
   规则 1-9（同类型包不可重复、临时限速编号互异）。
 - 自检：`scripts/selftest_rbc_msg.py` 提供 53 项可执行回归（含 17 个反例），
-  覆盖全部消息/信息包/用户包的编解码往返与定长断言。
+  覆盖全部消息/信息包/用户包的编解码往返与定长断言；`scripts/selftest_sim_xml.py`
+  覆盖模拟器 XML 的长度基线与结构限制；`scripts/selftest_gate.py` 覆盖生成门禁的拒绝路径
+  与 `--values-out` 回喂。
 
 > RBC 报文没有 CRC，仓库里也没有真机报文样本；"自洽通过"只证明长度、包长、位遍历与组成
 > 自洽，不证明 RBC 侧业务语义。协议里的冲突与实现取舍见 `references/protocol.md` 附录 B/C。
+> 模拟器 XML 的 P15 长度按模拟器模板计算（条件字段不打包），与 hex 生成器当前 P15 口径可能
+> 不同；模拟器输入以 `sim-xml.md` 为准。
 
 ## 添加新技能
 
@@ -125,7 +133,7 @@ python .\.opencode\skills\package-and-validate\scripts\build_opapp_tgz.py .
 产物默认写到项目目录的上一级：
 
 ```text
-airis-1.3.0.opapp.tgz
+airis-1.3.3.opapp.tgz
 ```
 
 `package-and-validate` 是开发专用技能，打包时会被自动排除，不会出现在 `.opapp.tgz` 中。包内只包含 `manifest.json`、`.opencode/` 运行配置和应用技能。

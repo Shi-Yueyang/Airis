@@ -1,0 +1,154 @@
+# 生成门禁 — 确认单、intent 与 provenance
+
+生成/修改报文前必须先过门禁。门禁不是建议：`gen_rbc_msg.py`（hex）和
+`gen_rbc_sim_xml.py`（模拟器 XML）都会检查，不通过就一个文件都不写。
+
+## 为什么要有门禁
+
+报文没有 CRC，生成器只校验长度、包长、位置、组成和字段位宽。`T_TRAIN=0`、
+`NID_ENGINE=0`、示例里的 `V_STATIC=80` 和真实业务值一样能打包成功——**“生成成功”
+不能证明取值是用户要的**。所以把“这些值从哪来”写成机器可检查的字段，而不是靠记忆。
+
+## 一、确认单（回答用户前先填）
+
+调用任何生成脚本前，先在回复里贴出这张表；任一格是「未确认」就停下来提问。
+
+| 项 | 值 | 来源 |
+|---|---|---|
+| 消息号 / 方向 / 条数 | M3 / 地→车 / 1 | 用户 |
+| 信息包列表（按空口顺序） | P15、P21 | 用户 |
+| 每个必填字段 | `L_ENDSECTION=3000` | 用户 |
+| 占位字段清单 | `V_STATIC=80` | 用户授权占位 |
+| 产物形态 | hex / sim-xml / 两者 | 用户 |
+| 输出目录 / 文件名 | `out/` / `M3.hex` | 用户 |
+| 是否覆盖同名文件 | 否 | 用户 |
+
+规则：
+
+- 来源只能写「用户」「用户授权占位」「反解导出」「协议默认」，不得写「示例」。
+- 组成类问题必须单选；用户多选出现互斥项时，先复述并确认，不得自行取舍。
+- `--describe` 的骨架不能代替确认单：骨架里的值是 `<待确认>`、`confirmed=false`，
+  直接复制会失败，这是故意的。
+
+## 二、values JSON 里的门禁块
+
+每个报文分组（顶层键）里都要有 `intent` 和 `provenance`，与 `header`、`packets` 同级：
+
+```json
+{
+  "M3": {
+    "intent": {
+      "message": "M3",
+      "target": "both",
+      "packets": ["P15", "P21", "P27"],
+      "confirmed": true
+    },
+    "provenance": {
+      "header": "user",
+      "P15": "user",
+      "P21": "user",
+      "P27": {"V_STATIC": "placeholder", "*": "user"}
+    },
+    "header": {"T_TRAIN": 34655, "M_ACK": 1, "NID_LRBG": 16681259},
+    "packets": [
+      {"packet": "P15", "fields": {"Q_SCALE": 1, "L_ENDSECTION": 3000}},
+      {"packet": "P21", "fields": {"N_ITER": 0}},
+      {"packet": "P27", "fields": {"Q_SCALE": 1, "V_STATIC": 80}}
+    ]
+  }
+}
+```
+
+### intent
+
+| 字段 | 允许值 | 说明 |
+|---|---|---|
+| `message` | `"M3"` | 必须与分组实际报文一致；分组键可以不是报文名 |
+| `target` | `"hex"` / `"sim-xml"` / `"both"` | 这份取值准备生成什么。hex 生成器拒绝 `sim-xml`，反之亦然；两种都要就写 `both` |
+| `packets` | 段标识数组 | 必须与实际包**顺序和数量**完全一致；没有信息包写 `[]` |
+| `confirmed` | `true` | 不是 `true` 一律拒绝生成 |
+
+段标识：普通包写 `P15`；P44 用户包写 `P44/CTCS-150`（CTCS-151 写成 `P44/CTCS-151`）。
+多个同类型包（如两个 P65）就重复写两次。
+
+### provenance
+
+`provenance` 给每个报文段标注来源，键是段标识，值是来源字符串或「字段→来源」对象：
+
+| 来源 | 含义 | 是否放行 |
+|---|---|---|
+| `user` | 用户明确给出的值 | 放行 |
+| `decoded` | `dump_rbc_msg.py --values-out` 反解导出 | 放行 |
+| `placeholder` | 占位/示例值，尚未核对 | 只有加 `--allow-placeholder` 才放行，并打印占位清单 |
+
+写法：
+
+- **段级**：`"P15": "user"` —— 该段所有字段都按这个来源。
+- **字段级**：`"P27": {"V_STATIC": "placeholder", "*": "user"}` —— 只为个别字段标注，
+  其余用 `"*"` 兜底；也可以用 `"V_STATIC#2"`、`"G_A(k)"` 这样的完整键。
+- **兜底**：`"*": "decoded"` 作为整条报文的默认来源；`"P44"` 可作为所有
+  `P44/CTCS-xxx` 段的父级默认。
+- 每个出现在 `header`/`packets` 里的段都必须有来源；字段级对象必须覆盖该段所有字段
+  （或提供 `"*"`）。多写不存在的段/字段会直接报错，防止拼错。
+
+## 三、命令行开关
+
+| 开关 | 作用 |
+|---|---|
+| `--allow-placeholder` | 明确授权本次生成使用占位值；不加则含 `placeholder` 的报文全部拒绝 |
+| `--set 分组.段.字段=值` | 临时覆盖；被覆盖的字段自动记为 `user`，不需要改 provenance。新增信息包时仍要同步 `intent.packets`，否则包顺序检查失败 |
+
+`--set` 的段写法与 provenance 一致：`M3.P15.L_ENDSECTION=3000`、
+`M3.P44.CTCS-150.NID_ENGINE=90`、`M3.header.NID_BG=523`。
+
+## 四、生成器会做的检查
+
+1. `intent`/`provenance` 存在且是对象；
+2. `confirmed=true`；
+3. `target` 与当前生成器匹配；
+4. `message` 与实际报文一致；
+5. `packets` 与实际包顺序一致（含 P44 用户包）；
+6. `provenance` 覆盖每个段、每个字段，且没有多余键；
+7. 来源值只能是 `user`/`decoded`/`placeholder`；
+8. 含 `placeholder` 时必须有 `--allow-placeholder`。
+
+任一失败：退出码 1，列出全部问题，不写任何文件。
+
+## 五、审计行（必须贴进交付说明）
+
+生成成功后会打印：
+
+```
+审计: 用户 0 / 解码 0 / 占位 32 / 协议默认 16
+占位: P27.V_STATIC
+```
+
+交付说明里原样保留这一行；`占位` 不为 0 时必须逐项说明“尚未核对、需替换”。
+`协议默认` 的数量来自 `result["fallbacks"]`，也要确认是否符合本轮测试意图。
+
+## 六、反解导出与修改
+
+`dump_rbc_msg.py --values-out captured.json` 会写出 `intent`（`target=both`、
+`confirmed=true`）和 `provenance`（全部 `decoded`），可以直接回喂生成器。
+
+在导出的文件上改字段时：
+
+- 改了哪个段，就把那个段的来源改成 `"user"`（或字段级标注），否则审计行仍写 `decoded`；
+- 新增/删除信息包时同步改 `intent.packets`；
+- 只做临时改动优先用 `--set`，它自动记为 `user`。
+
+## 七、失败信息对照
+
+| 报错 | 处理 |
+|---|---|
+| `缺少 intent` / `缺少 provenance` | 按本文模板补到报文分组里 |
+| `intent.confirmed 不是 true` | 确认单没完成，回去问用户 |
+| `intent.packets 声明 …，实际包顺序是 …` | 组成与声明不一致，先确认再改 |
+| `这份取值标的是 hex，不能用来生成 sim-xml` | 改 `target`，或换对应生成器 |
+| `provenance 缺少 "P15" 段` | 补 `"P15": "user"` 或对象形式 |
+| `provenance 键 … 没有对应的报文段` | 段名拼错，或包已被删除 |
+| `有 N 个占位字段（…）` | 补真实值；确认可用占位后加 `--allow-placeholder` |
+| `provenance.P27 里的字段 "X" 不在该段取值里` | 字段名拼错或放错段 |
+
+门禁只解决“值从哪来、组成是否被确认”，**不证明业务正确**：没有真机样本或模拟器
+实际发送时，报告中仍要写明验证边界。

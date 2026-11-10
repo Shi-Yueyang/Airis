@@ -2,64 +2,67 @@
 
 只读：不改写输入文件，不做推断。输入是 hex 文本或原始二进制，输出一篇 Markdown 报告。
 
+## 格式参考
+
+报文结构（消息头、信息包、P44 内层用户包、`L_MESSAGE`/`L_PACKET` 口径）定义在本技能目录的 `references/protocol.md`；`scripts/rbc_spec.py` 是实现，不是查询入口。
+
 ## 输入
 
 - **hex 文本**：一行或多行，允许空格、逗号、分号、冒号、`0x` 前缀（监视工具/串口日志直接粘贴）。
 - **原始二进制**：`--format bin` 强制；默认按"首字节是不是已知的 NID_MESSAGE"自动判别。
 - 一条文件里有多条报文时加 `--split`，按 `L_MESSAGE` 逐条解析。
 - 报文结构来自 `references/protocol.md`，不需要模板文件。
+- Python 3，仅标准库。Windows PowerShell 先执行 `$env:PYTHONUTF8=1`（cmd 用 `set PYTHONUTF8=1`），否则中文报告可能乱码；报告建议用 `-o` 写文件后再读，不要依赖控制台回显。
 
-## 命令
+## 规则
 
-脚本路径 `<skill-dir>` 指本技能目录；输入输出路径相对当前工作目录。
+1. **只读**：绝不改写输入的 hex/二进制文件；反解只产生报告和可选的取值导出。
+2. **不猜测**：未知 `NID_MESSAGE`、未收录的信息包/用户包、位流越界都只报告并停止该条报文，不要用"大概是这样"补字段。
+3. **先判定可信再依赖**：只有 `L_MESSAGE` 一致、每个包的 `L_PACKET` 声明与计算一致、位遍历闭合、组成校验无错误且没有告警时，报告里的字段值才可用。
+4. **先处理告警**：`L_MESSAGE`/`L_PACKET` 判 `MISMATCH`、`剩余 N bit 未解析`、`末尾填充位不是全 1`、未知包号等告警必须解决或解释清楚，再引用任何字段值。
 
-```sh
-python <skill-dir>/scripts/dump_rbc_msg.py m3.hex -o m3_report.md
-python <skill-dir>/scripts/dump_rbc_msg.py --hex "03 13 80 00 21 D7 FF D1 25 61 E8 2E 50"
-python <skill-dir>/scripts/dump_rbc_msg.py capture.dat --format bin --split -o report.md
-python <skill-dir>/scripts/dump_rbc_msg.py m3.hex --values-out values.json -o report.md
-```
+## 工作流
 
-`--values-out` 是"定点修改"的捕获步骤（`edit.md`）；它把整条报文（含所有已解出的字段）
-写成 `gen_rbc_msg.py --values` 能直接吃的 JSON。默认不用它，反解的交付物就是报告。
+1. **准备输入** — 确认输入是 hex 文本还是原始二进制；多条报文拼接时加 `--split`；需要定点修改时准备 `--values-out`。
+2. **执行反解** — 解码器是 `scripts/dump_rbc_msg.py`；下文的 `<skill-dir>` 指本技能目录，输入输出路径相对当前工作目录解析。
 
-选项：
+   ```sh
+   python <skill-dir>/scripts/dump_rbc_msg.py m3.hex -o m3_report.md
+   python <skill-dir>/scripts/dump_rbc_msg.py --hex "03 13 80 00 21 D7 FF D1 25 61 E8 2E 50"
+   python <skill-dir>/scripts/dump_rbc_msg.py capture.dat --format bin --split -o report.md
+   python <skill-dir>/scripts/dump_rbc_msg.py m3.hex --values-out values.json -o report.md
+   ```
 
-| 选项 | 用途 |
-|---|---|
-| `-o PATH` | 报告写文件；不给就打到 stdout |
-| `--split` | 拼接流逐条解析（按 L_MESSAGE 切） |
-| `--values-out PATH` | 额外导出取值 JSON（编辑回环用） |
-| `--p72-charset utf-16-be\|utf-16-le\|gb18030` | P72 纯文本编码（附录 B-1） |
-| `--ctcs132-sig-bits N` | CTCS-132 的 NID_SIG 位宽（附录 B-6） |
+   `-o` 把 Markdown 报告写入文件；不给则输出到 stdout。`--values-out` 是"定点修改"的捕获步骤（`edit.md`）：它把整条报文（含所有已解出的字段）写成 `gen_rbc_msg.py --values` 能直接吃的 JSON，并自动带上门禁块（`intent` 与全 `decoded` 的 `provenance`）；默认不用它，反解的交付物就是报告。
 
-## 怎么看报告
+   | 选项 | 用途 |
+   |---|---|
+   | `-o PATH` | 报告写文件；不给就打到 stdout |
+   | `--split` | 拼接流逐条解析（按 L_MESSAGE 切） |
+   | `--values-out PATH` | 额外导出取值 JSON（编辑回环用） |
+   | `--p72-charset utf-16-be\|utf-16-le\|gb18030` | P72 纯文本编码（附录 B-1） |
+   | `--ctcs132-sig-bits N` | CTCS-132 的 NID_SIG 位宽（附录 B-5） |
 
-- 每条报文开头：`报文：M3 行车许可 MA（地→车），78 字节，3 个信息包`，随后是结论：
-  **自洽通过** / **自洽但有待核实**（有告警）/ **不可依赖**（有错误）。
-- 自洽检查表：`L_MESSAGE`（声明值 vs 字段实际结束位置）、`报文上限`（500 字节）、
-  `位遍历闭合`（消费多少 bit、末尾还剩多少补位）、`填充位`（是否全 1）。
-- 每个信息包一张表：`起始位 | 位宽 | 字段 | 取值 | 说明`。迭代组会展开成 `NAME(0)`、`NAME(0,1)`，
-  嵌套层用缩进表示；条件字段在该报文里不出现时标 `（不进报文）`。
-- 包标题行给出 `L_PACKET 声明 x bit / 计算 y bit（OK|MISMATCH）`；P44 会分别给出外层与内层。
-- `说明` 列给出枚举含义、按 `Q_SCALE` 换算的距离、速度量纲、未知哨兵提示和协议备注。
-  速度字段取到 7 bit 上限（127）时会标"常表示无限制"。
-- P72 文本、IP 字段、CTCS-51 数据块分别显示为字符串、双 IP、hex 串；`L_TEXT` 在
-  UTF-16 下是字符数，GB18030 下是字节数（`--p72-charset`）。
+3. **解读报告** —
+   - 每条报文开头：`报文：M3 行车许可 MA（地→车），78 字节，3 个信息包`，随后是结论：**自洽通过** / **自洽但有待核实**（有告警）/ **不可依赖**（有错误）。
+   - 自洽检查表：`L_MESSAGE`（声明值 vs 字段实际结束位置）、`报文上限`（500 字节）、`位遍历闭合`（消费多少 bit、末尾还剩多少补位）、`填充位`（是否全 1）。
+   - 每个信息包一张表：`起始位 | 位宽 | 字段 | 取值 | 说明`。迭代组会展开成 `NAME(0)`、`NAME(0,1)`，嵌套层用缩进表示；条件字段在该报文里不出现时标 `（不进报文）`。
+   - 包标题行给出 `L_PACKET 声明 x bit / 计算 y bit（OK|MISMATCH）`；P44 会分别给出外层与内层。
+   - `说明` 列给出枚举含义、按 `Q_SCALE` 换算的距离、速度量纲、未知哨兵提示和协议备注。速度字段取到 7 bit 上限（127）时会标"常表示无限制"。
+   - P72 文本、IP 字段、CTCS-51 数据块分别显示为字符串、双 IP、hex 串；`L_TEXT` 在 UTF-16 下是字符数，GB18030 下是字节数（`--p72-charset`）。
+4. **判定是否可信** — 一条报文可以拿来用，必须同时满足：
+   - `L_MESSAGE` 一致（`OK`）；
+   - 每个包的 `L_PACKET` 声明与计算一致；
+   - 位遍历闭合：末尾只剩 ≤7 bit，且都是 1；
+   - 组成校验没有错误（必选包齐、无重复包、方向正确、CTCS 用户包在该消息的组成表里）；
+   - 没有告警；有告警就逐条解释清楚它在协议里意味着什么。
 
-## 成功标准
+   不满足时**不要**引用报告里的字段值：位置可能已经漂移，越靠后的字段越不可信。
+5. **报告** — 写清输入文件、消息号与条数、`L_MESSAGE`/`L_PACKET` 结果、位遍历与组成校验结果、告警清单，以及没有执行的检查。
 
-一条报文可以拿来用，必须同时满足：
+## 失败处理
 
-1. `L_MESSAGE` 一致（`OK`）；
-2. 每个包的 `L_PACKET` 声明与计算一致；
-3. 位遍历闭合：末尾只剩 ≤7 bit，且都是 1；
-4. 组成校验没有错误（必选包齐、无重复包、方向正确、CTCS 用户包在该消息的组成表里）；
-5. 没有告警；有告警就逐条解释清楚它在协议里意味着什么。
-
-不满足时**不要**引用报告里的字段值：位置可能已经漂移，越靠后的字段越不可信。
-
-## 告警与错误对照
+解码器只报告、不猜测：未知消息号、未收录的包、位流越界会产生按报文的错误，批处理继续。
 
 | 报告里的字样 | 含义 | 处理 |
 |---|---|---|
@@ -75,7 +78,10 @@ python <skill-dir>/scripts/dump_rbc_msg.py m3.hex --values-out values.json -o re
 | `Q_TRACKINIT=1` | 国内 ATP 不接受 | 该包应从报文里去掉 |
 | `CTCS-150…哨兵` | `Q_EOATYPE` 与全 F 哨兵填写不一致 | 联调前修正 |
 
-## 退出码
+退出码：`0` 全部报文都解出来了（告警不影响）；`1` 至少一条报文出现错误（截断、未知消息号、未收录包、位流越界）。
 
-`0` 全部报文都解出来了（告警不影响）；`1` 至少一条报文出现错误（截断、未知消息号、
-未收录包、位流越界）。
+## 限制
+
+- 报文没有 CRC；`L_MESSAGE`/`L_PACKET` 一致、位遍历闭合、组成校验通过只证明编解码闭环，不证明 RBC 侧业务语义。
+- 未收录的消息/信息包/用户包不在本流程范围内；需要先在 `references/protocol.md` 附录 C 与 `rbc_spec.py` 中补定义。
+- 一条消息 ≤ 500 字节；含多条报文的流请用 `--split`，不要当成一条报文反解。
