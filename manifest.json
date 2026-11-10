@@ -27,7 +27,7 @@
   },
   "listing": {
     "subtitle": "自然语言反解、生成和定点修改 CVC 应用数据与 TACN RBC 报文",
-    "description_md": "Airis 是面向铁路产品研发与测试人员的数据制作智能体。当前版本内置两个技能：cvc-data 负责 CVC 应用数据文件 ASW1.bin、Config2.line1、Config1.train 的反解、生成、定点修改与校验，用 ATP/SDMU 模板输出字段遍历报告、解释 CRC 与模板版本告警，并要求生成结果重新反解后 CRC 与字段遍历都通过；tacn-rbc-data 负责 TACN 车地无线（OBS↔RBC）报文的生成、反解与定点修改，覆盖地→车与车→地的全部消息、P0~P80 信息包和 P44 内的 CTCS 用户包，报文结构内置，输出可直接联调的 hex 报文串或 Markdown 字段报告，并校验 L_MESSAGE、包内 L_PACKET、位遍历闭合与报文组成；同一份取值 JSON 还能生成 RBC 模拟器的 DataTable XML 输入文件（RBC→车，UTF-8 BOM，行序即线序，自动回填长度字段）。生成前强制填写确认单（intent/provenance，标注用户值、反解值与占位值），缺确认或占位值未授权时脚本拒绝生成。所有生成与修改结果都会重新反解或读回校验，必要时输出修改前后差异；没有真机样本或模拟器可执行文件时会明确说明验证边界。",
+    "description_md": "Airis 是面向铁路产品研发与测试人员的数据制作智能体。当前版本内置两个技能：cvc-data 负责 CVC 应用数据文件 ASW1.bin、Config2.line1、Config1.train 的反解、生成、定点修改与校验，用 ATP/SDMU 模板输出字段遍历报告、解释 CRC 与模板版本告警，并要求生成结果重新反解后 CRC 与字段遍历都通过；tacn-rbc-data 负责 TACN 车地无线（OBS↔RBC）报文的生成、反解与定点修改，覆盖地→车与车→地的全部消息、P0~P80 信息包和 P44 内的 CTCS 用户包，报文结构内置，输出可直接联调的 hex 报文串或 Markdown 字段报告，并校验 L_MESSAGE、包内 L_PACKET、位遍历闭合与报文组成；同一份取值 JSON 还能生成 RBC 模拟器的 DataTable XML 输入文件（RBC→车，UTF-8 BOM，行序即线序，自动回填长度字段）；按测试场景（进入虚拟编组、CN→C0 / C0→CN 等级转换、自由行车许可场景）可以一次生成一组模拟器 XML，并给出文件顺序与投递间隔。生成前强制填写确认单（intent/provenance，标注用户值、反解值与占位值），缺确认或占位值未授权时脚本拒绝生成。所有生成与修改结果都会重新反解或读回校验，必要时输出修改前后差异；没有真机样本或模拟器可执行文件时会明确说明验证边界。",
     "category": "dev",
     "support_contact": "airis-team@example.com"
   },
@@ -45,7 +45,7 @@
       {
         "title": "RBC 报文工具",
         "desc": "生成 hex 报文，或反解并校验",
-        "prompt": "按我给的取值生成 RBC 报文（hex）；或反解我提供的 RBC 报文 hex，输出字段报告并确认 L_MESSAGE、各包 L_PACKET 和位遍历是否自洽。",
+        "prompt": "生成一条 M3 行车许可报文（hex，地→车）：T_TRAIN=3277070、M_ACK=1、NID_C=1018、NID_BG=523；单区段，L_ENDSECTION=3000 m，带 P15、P21（平坡 0‰）、P27（静态速度 80 km/h），不含临时限速；缺的取值先问我，生成后反解核对 L_MESSAGE、各包 L_PACKET 与位遍历闭合。",
         "icon": "code"
       },
       {

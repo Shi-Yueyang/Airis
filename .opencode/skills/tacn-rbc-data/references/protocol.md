@@ -3,7 +3,7 @@
 > 依据 RA20016_C4D-IND-ATP_CASCO_2003（OBS-RBC 外部接口定义），仅收录 TACN 变体的消息与信息包数据结构。
 >
 > 本文是编解码脚本的结构真相源；脚本层的约定（L_PACKET 计数口径、P44 嵌套、键写法、
-> 定长回归表）见 **附录 C**，源文档里的冲突与缺口见 **附录 B**。
+> 定长结果表）见 **附录 C**，源文档里的冲突与缺口见 **附录 B**。
 
 ## 0. 数据层级模型
 
@@ -682,10 +682,10 @@ P44（NID_PACKET=44）携带用户包；一条消息可含多个 P44，内嵌用
    UTF-16BE，可用 `--p72-charset utf-16-le|gb18030` 切换。
 2. M16/M18 的 L_MESSAGE：帧头 75 bit + NID_EM 4 bit = 79 bit，正好 10 字节，源表标的 10 与
    实际一致（生成时已按定长校验）。
-3. P15 末区段定时：§5.3 只列了 `Q_SECTIONTIMER / Q_ENDTIMER`，而源文档的两张 M3
-   样例在 `L_ENDSECTION` 之后还给出了
-   `T_ENDTIMER`、`D_ENDTIMERSTARTLOC`，并重复了一组 `Q/T/D_SECTIONTIMER`。本实现按样例表，
-   即末区段三件套恒定写出；联调若发现整条报文往后偏 26 bit，优先怀疑这里。
+3. P15 末区段定时：按源文档的两张 M3 样例——`L_ENDSECTION` 之后恒定写出 `T_ENDTIMER`、
+   `D_ENDTIMERSTARTLOC` 和第二组 `Q/T/D_SECTIONTIMER`（§5.3 只列了
+   `Q_SECTIONTIMER / Q_ENDTIMER` 两个限定词）。单区段 P15 因此是 185 bit；按 §5.3
+   解析会少 26 bit。
 4. P5 的 NID_C：§5.2 规定 `Q_NEWCOUNTRY=1` 时才带 NID_C，但源文档的 M3 样例在
    `Q_NEWCOUNTRY=0` 时仍写了 NID_C。本实现按 §5.2（条件存在）。
 5. CTCS-132 的 NID_SIG 位宽：§8.6 写"n 依编号规则"，没给具体位数。默认按 8 bit，
@@ -733,8 +733,8 @@ P44（NID_PACKET=44）携带用户包；一条消息可含多个 P44，内嵌用
 - 地→车：`NID_PACKET 8 + Q_DIR 2 + L_PACKET 13` → `NID_XUSER 9 + Q_DIR 2 + L_PACKET 13` → 包体。
 - 车→地：`NID_PACKET 8 + L_PACKET 13` → `NID_XUSER 9 [+ Q_DIR 2] + L_PACKET 13` → 包体；
   目前只有 CTCS-84 的内层头带 Q_DIR（§9.2）。
-- **外层 P44 的 L_PACKET 含整个内层用户包**；内层 L_PACKET 只到内层包体结束。这是本节
-  唯一没有协议直接证据的取舍（协议只给出了内层的 CTCS-136=46），联调时请优先核对。
+- **外层 P44 的 L_PACKET 含整个内层用户包**；内层 L_PACKET 只到内层包体结束。核对锚点：
+  M24 + P44/CTCS-80（N_TRAINNUM=2）外层 219 bit、内层 196 bit，合计 294 bit / 37 字节。
 
 ### C.4 取值 JSON 的键写法
 
@@ -761,20 +761,9 @@ P44（NID_PACKET=44）携带用户包；一条消息可含多个 P44，内嵌用
 7. 语义：P68 `Q_TRACKINIT=1` 失败；CTCS-150 `Q_EOATYPE` 与哨兵填写不一致 → 告警；
    CTCS-152 后车字段填全 F → 告警。
 
-### C.6 回归自检
+### C.6 已知定长结果（交付核对基线）
 
-`scripts/selftest_rbc_msg.py` 是这些约定的可执行版本（53 项，含 17 个反例）：
-
-```
-python <skill-dir>/scripts/selftest_rbc_msg.py
-```
-
-其中"定长断言"就是 C.5-1 那张表；另外每条报文都做两遍往返：
-
-1. 编码时显式给过的每个值，解码必须在同一位置读回同一个值；
-2. 解码 → `--values-out` → 再编码，必须得到**同一串字节**。
-
-已知的定长结果（可直接当回归基线）：
+生成或反解后，可直接用这张表核对 `L_MESSAGE` 与各包 `L_PACKET`：
 
 | 消息/包 | 断言 |
 |---|---|
@@ -789,5 +778,5 @@ python <skill-dir>/scripts/selftest_rbc_msg.py
 
 这些数字来自协议本身，**不是**真机比对：仓库里没有任何 RBC 报文的二进制样本。拿到真机
 报文后，请先用 `dump_rbc_msg.py` 反解，把 `L_MESSAGE`、各包 `L_PACKET`、`walk` 与本文
-对照，再把该报文补进自检用例。
+对照。
 

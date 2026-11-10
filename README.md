@@ -25,11 +25,12 @@
         │   └── scripts/
         │       ├── dump_cvc_data.py
         │       └── gen_cvc_data.py
-        ├── tacn-rbc-data/            # 应用能力：TACN 车地无线报文生成 / 反解 / 定点修改 / 模拟器输入
+        ├── tacn-rbc-data/            # 应用能力：TACN 车地无线报文生成 / 反解 / 定点修改 / 模拟器输入 / 场景序列
         │   ├── SKILL.md
         │   ├── decode.md
         │   ├── generate.md
         │   ├── sim-xml.md
+        │   ├── scenario.md
         │   ├── edit.md
         │   ├── references/
         │   │   ├── protocol.md
@@ -100,6 +101,8 @@ opencode
 - 模拟器输入：把同一份取值 JSON 渲染成 RBC 模拟器的 `DataTable` XML（RBC→车，UTF-8 BOM，
   行序即线序，自动回填 `L_MESSAGE`/`L_PACKET`）；只支持模拟器分派表内的消息/信息包/用户包，
   生成后按 `rbc-simulator-input-xml.md` 第 7 节的长度基线校验。
+- 场景序列：按测试场景一次生成一组模拟器 XML（进入虚拟编组、CN→C0 / C0→CN 等级转换、
+  自由 MA 场景），输出有序文件名 + 投递顺序与间隔；自由场景先把需求映射成信息包再生成。
 - 反解：hex 文本或原始二进制 → Markdown 字段报告（起始位/位宽/取值/含义），并给出
   `L_MESSAGE`、包内 `L_PACKET`、位遍历闭合、填充位、组成规则的自洽结论。
 - 定点修改：反解导出取值 → 只改目标键 → 重新生成 → 再反解并做键级差异对比。
