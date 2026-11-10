@@ -1,7 +1,7 @@
 # Airis 铁路测试数据智能体
 
 - **app_id**: `airis`
-- **版本**: 1.3.3
+- **版本**: 1.4.1
 - **类型**: 对话型应用
 - **用途**: 面向铁路产品研发与测试人员，用自然语言驱动测试数据的反解、生成、定点修改与校验。
 
@@ -42,6 +42,12 @@
         │       ├── gen_rbc_sim_xml.py
         │       ├── selftest_rbc_msg.py
         │       └── selftest_sim_xml.py
+        ├── smartcore-plug/          # 应用能力：SmartCore_plug.xls → SmartCore_plug.ctcs
+        │   ├── SKILL.md
+        │   ├── references/format.md
+        │   └── scripts/
+        │       ├── gen_ctcs.py
+        │       └── selftest_ctcs.py
         └── package-and-validate/     # 开发工具：校验 + 打包（不随发布包分发）
             ├── SKILL.md
             ├── references/dev-studio-path-map.md
@@ -54,7 +60,7 @@
 ## 环境要求
 
 - OpenCode
-- Python 3（`cvc-data`、`tacn-rbc-data` 与打包校验脚本只依赖标准库）
+- Python 3：`cvc-data`、`tacn-rbc-data` 与打包校验脚本只依赖标准库；`smartcore-plug` 额外需要 `xlrd`（读 `.xls`）
 - Windows 命令行建议先 `set PYTHONUTF8=1`，否则中文报错可能显示成乱码
 
 ## 启动
@@ -65,7 +71,7 @@
 opencode
 ```
 
-启动后可使用 Airis 主 Agent、`cvc-data`、`tacn-rbc-data`，以及本地开发技能 `package-and-validate`。
+启动后可使用 Airis 主 Agent、`cvc-data`、`tacn-rbc-data`、`smartcore-plug`，以及本地开发技能 `package-and-validate`。
 
 ## 应用能力
 
@@ -112,6 +118,17 @@ opencode
 > 模拟器 XML 的 P15 长度按模拟器模板计算（条件字段不打包），与 hex 生成器当前 P15 口径可能
 > 不同；模拟器输入以 `sim-xml.md` 为准。
 
+### smartcore-plug：SmartCore 车载应用配置（`SmartCore_plug.xls` → `SmartCore_plug.ctcs`）
+
+- 生成：把 xls 的 Data 工作表每行按 `size` 列（字节数）大端序列化，末尾追加 CRC-32
+  （poly 0x04C11DB7，init 0，非反射）与 64 字节零填充，输出 2020 字节可烧录的 `.ctcs` 文件。
+- 查询配置：按模板 xls 的字段结构，读取 `.ctcs` 中指定配置项的当前值。
+- 编辑定制：修改 `.ctcs` 中指定配置项，自动重算 CRC 并输出新文件。
+- 自检：`scripts/selftest_ctcs.py` 要求生成结果与参考样本字节级一致；无参考样本时
+  校验 CRC 值与原始工具日志一致。
+- 验证边界：格式基于单个参考样本逆向得出，64 字节零填充为观察到的固定尾部；模板结构
+  变化时需重新核对 `references/format.md`。
+
 ## 添加新技能
 
 1. 在 `.opencode/skills/<skill-name>/` 下创建 `SKILL.md`，`name` 与目录名保持一致。
@@ -133,7 +150,7 @@ python .\.opencode\skills\package-and-validate\scripts\build_opapp_tgz.py .
 产物默认写到项目目录的上一级：
 
 ```text
-airis-1.3.3.opapp.tgz
+airis-1.4.1.opapp.tgz
 ```
 
 `package-and-validate` 是开发专用技能，打包时会被自动排除，不会出现在 `.opapp.tgz` 中。包内只包含 `manifest.json`、`.opencode/` 运行配置和应用技能。
