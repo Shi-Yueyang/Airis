@@ -10,14 +10,23 @@ description: "根据 SmartCore_plug.xls 生成 SmartCore_plug.ctcs（SmartCore �
 ## 前置条件
 
 - Python 3.8+，依赖 `xlrd` 读取 .xls（BIFF8 格式）。
-- 输入：`SmartCore_plug.xls`，至少包含 `Data` 工作表，列：A=字段名，B=size（字节数），C=Value。
+- 输入：`SmartCore_plug.xls`，至少包含 `Data` 工作表，列：A=字段名，B=size（字节数），C=Value；模板 xls 用于定义字段偏移和大小。
 - 输出：`SmartCore_plug.ctcs`，2020 字节（1956 字节数据 + 4 字节 CRC + 64 字节零填充）。
 
-## 最短流程
+## 功能流程
 
+### 生成 .ctcs 文件
 1. 读取 xls 的 Data 工作表，按行顺序序列化（详见 `references/format.md`）。
-2. 运行 `scripts/gen_ctcs.py SmartCore_plug.xls -o SmartCore_plug.ctcs`。
+2. 运行 `scripts/gen_ctcs.py generate <input.xls> -o <output.ctcs>`。
 3. 运行 `scripts/selftest_ctcs.py` 验证输出与参考样本字节一致。
+
+### 查询配置项值
+从 .ctcs 文件中查询指定配置项的当前值，需要模板 xls 定义字段的结构和偏移。
+运行 `scripts/gen_ctcs.py query <input.ctcs> --field <field_name> -t <template.xls>`。
+
+### 编辑/定制配置项值
+修改 .ctcs 文件中指定配置项的值，自动更新 CRC 校验和，需要模板 xls 定义字段的偏移和大小。
+运行 `scripts/gen_ctcs.py edit <input.ctcs> --field <field_name> --value <new_value> -t <template.xls> -o <output.ctcs>`。
 
 ## 格式要点（详见 references/format.md）
 
@@ -36,4 +45,4 @@ description: "根据 SmartCore_plug.xls 生成 SmartCore_plug.ctcs（SmartCore �
 ## 验证纪律
 
 - 生成后必须运行 `selftest_ctcs.py`，要求字节级一致（PASS）。
-- 无参考样本时，至少校验 CRC 值与原始工具日志一致（如 `0xa6805464`）。
+- 查询/编辑时必须提供模板 xls，否则无法确定字段的偏移和大小；编辑后会自动更新 CRC，确保文件完整性。

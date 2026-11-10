@@ -55,16 +55,10 @@
         "icon": "code"
       },
       {
-        "title": "SmartCore 配置生成",
-        "desc": "xls 转 ctcs 二进制配置",
-        "prompt": "根据我上传的 SmartCore_plug.xls 生成 SmartCore_plug.ctcs，校验 CRC 并输出文件。",
+        "title": "SmartCore 配置工具",
+        "desc": "生成、查询或修改 SmartCore 配置",
+        "prompt": "根据我上传的 SmartCore_plug.xls 生成 SmartCore_plug.ctcs；或查询 ctcs 中指定配置项的值；或修改 ctcs 中指定配置项的值，输出新文件。",
         "icon": "bolt"
-      },
-      {
-        "title": "生成 RBC 模拟器 XML",
-        "desc": "输出 DataTable XML，供模拟器加载",
-        "prompt": "按我给的取值生成 RBC 模拟器的 DataTable XML 输入文件（如 dataTableM3.xml，仅 RBC→车），说明 L_MESSAGE、各包长度、占位与回退字段。",
-        "icon": "file"
       }
     ]
   }
