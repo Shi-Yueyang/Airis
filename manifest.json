@@ -1,6 +1,6 @@
 {
   "app_id": "airis",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "name": "Airis 铁路测试数据智能体",
   "description": "面向铁路产品测试的数据制作智能体：用自然语言完成 CVC 应用数据与 TACN 车地无线报文的生成、反解、定点修改与校验。",
   "workspace_mode": "isolated",
@@ -37,28 +37,28 @@
     "subtitle": "描述测试意图，或上传模板、报文与原始配置，我会规划步骤并调用技能完成数据制作。",
     "cards": [
       {
-        "title": "生成 CVC 数据",
-        "desc": "按 values.json 生成，只改目标字段",
-        "prompt": "根据 ATP 和 SDMU 模板以及 values.json 生成 CVC 三件套；如果是修改，只改我指定的字段，其余保持不变并输出差异。",
+        "title": "CVC 配置工具",
+        "desc": "生成、反解、修改 CVC 应用数据",
+        "prompt": "根据 ATP 和 SDMU 模板以及 values.json 生成 CVC 三件套（ASW1.bin、Config2.line1、Config1.train）；或反解我上传的 CVC 文件，输出字段遍历报告与告警；定点修改时只改我指定的字段，其余保持不变并输出差异。",
         "icon": "bolt"
       },
       {
-        "title": "反解 CVC 应用数据",
-        "desc": "查看字段遍历报告与告警",
-        "prompt": "反解我上传的 ASW1.bin、Config2.line1 和 Config1.train，用 ATP/SDMU 模板输出字段报告和告警。",
-        "icon": "file"
-      },
-      {
-        "title": "RBC 报文生成/反解",
+        "title": "RBC 报文工具",
         "desc": "生成 hex 报文，或反解并校验",
         "prompt": "按我给的取值生成 RBC 报文（hex）；或反解我提供的 RBC 报文 hex，输出字段报告并确认 L_MESSAGE、各包 L_PACKET 和位遍历是否自洽。",
         "icon": "code"
       },
       {
-        "title": "SmartCore 配置工具",
+        "title": "EVC 配置工具",
         "desc": "生成、查询或修改 SmartCore 配置",
         "prompt": "根据我上传的 SmartCore_plug.xls 生成 SmartCore_plug.ctcs；或查询 ctcs 中指定配置项的值；或修改 ctcs 中指定配置项的值，输出新文件。",
         "icon": "bolt"
+      },
+      {
+        "title": "help/帮助",
+        "desc": "本智能体的操作手册",
+        "prompt": "请介绍 Airis 的全部能力与使用方法：包括 CVC 应用数据、RBC 报文、EVC（SmartCore 配置）三类任务各自需要上传哪些文件、我该如何描述取值意图、生成与反解结果会包含哪些校验、以及常见告警（CRC 不匹配、模板/数据版本不一致、字段越界）该如何处理。",
+        "icon": "book"
       }
     ]
   }
