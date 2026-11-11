@@ -98,6 +98,29 @@ from pathlib import Path
 MAGIC_DIST = {0xABABABAB: "DP", 0xACACACAC: "LINE", 0xADADADAD: "TRAIN"}
 
 
+def ensure_utf8_stdio():
+    """Force stdout/stderr to UTF-8.
+
+    Windows defaults to the system code page (cp936/GBK on Chinese installs), where some
+    characters used in reports raise UnicodeEncodeError. Skipped when already UTF-8 or
+    when the stream has no reconfigure() (replaced by an IDE or test framework).
+    """
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            continue
+        encoding = (getattr(stream, "encoding", "") or "").replace("-", "").lower()
+        if encoding == "utf8":
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
+
 class DecodeError(Exception):
     pass
 
@@ -332,6 +355,7 @@ def render_markdown(records, trailing, title, meta, out_file):
 
 
 def main(argv=None):
+    ensure_utf8_stdio()
     ap = argparse.ArgumentParser(
         description="Decode STCS application data binary files into a Markdown report driven by a template XML",
         formatter_class=argparse.RawDescriptionHelpFormatter,

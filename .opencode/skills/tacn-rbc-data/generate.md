@@ -8,17 +8,17 @@
 
 ## 必需输入
 
-- Python 3（仅标准库）。Windows PowerShell 先执行 `$env:PYTHONUTF8=1`（cmd 用 `set PYTHONUTF8=1`），否则中文报错可能乱码。
+- Python 3（仅标准库）。
 - 一份取值 JSON（`--values`，**每次运行都必须给**）：顶层每个键是一条报文，键名就是输出文件名；
   每个分组都要有 `intent` + `provenance` 门禁块（格式见 `references/gate.md`）。只查结构用
   `--describe M155`，不需要 JSON。
 - 一个可写的输出目录（`-o`，默认当前目录）；同名文件会被覆盖。生成前先把目录和文件名跟用户对齐，并检查目标文件是否已存在。
-- 用户只给一个消息号并不算完整需求：生成前按 `SKILL.md` 的确认单逐项对齐，不要替用户编业务值。
+- 用户只给一个消息号并不算完整需求：生成前按 `references/gate.md` 的确认单逐项对齐，不要替用户编业务值。
 
 ## 规则
 
-1. **先过门禁**：按 `SKILL.md` 的确认单收齐“报文与数量、字段取值、占位授权、输出格式、
-   存放位置、文件名、是否覆盖”，写进 `intent` + `provenance`；未确认不得生成。
+1. **先过门禁**：按 `references/gate.md` 的确认单收齐“报文与数量、场景、字段取值、占位授权、
+   输出格式、存放位置、文件名、是否覆盖”，写进 `intent` + `provenance`；未确认不得生成。
 2. **示例值不能原样交付**：`--describe` 的骨架是 `<待确认>` + `confirmed=false`，直接复制
    会被拒绝，这是故意的。占位值必须在 `provenance` 标 `placeholder` 并加
    `--allow-placeholder`。
@@ -117,7 +117,7 @@
 
 **最小样例（三类消息）**
 
-先用 `gen_rbc_msg.py --describe M155` 看结构，再套下面三类骨架。示例 hex 是本实现的自测基线，**不是真机样本**。
+先用 `gen_rbc_msg.py --describe M155` 看结构，再套下面三类骨架。示例 hex 是本实现的自测基线，**不是真机样本**。纯帧头消息（M6/M39/M41/M154/M155/M156/M159）没有信息包，看 `--describe` 加下面第 1 类样例就够了。
 
 **1）纯帧头：M155**（车→地，10 字节，无信息包）
 
@@ -162,7 +162,7 @@
 
 ## 工作流
 
-1. **准备取值** — 先用 `gen_rbc_msg.py --describe <消息号>` 看方向、`L_MESSAGE`、帧头字段、必选/可选信息包；按 `SKILL.md` 的确认单收齐取值，写 `intent` + `provenance`，再按骨架写 `header` + `packets`（`--values` 必填，无信息包也要写 `"packets": []`，`intent.packets` 写 `[]`）。
+1. **准备取值** — 先用 `gen_rbc_msg.py --describe <消息号>` 看方向、`L_MESSAGE`、帧头字段、必选/可选信息包；按 `references/gate.md` 的确认单收齐取值，写 `intent` + `provenance`，再按骨架写 `header` + `packets`（`--values` 必填，无信息包也要写 `"packets": []`，`intent.packets` 写 `[]`）。
 2. **生成** — 生成器是 `scripts/gen_rbc_msg.py`；下文的 `<skill-dir>` 指本技能目录，输出路径相对当前工作目录解析。`--help` 列出所有选项。
 
    ```sh
@@ -225,9 +225,3 @@
 | `列表只有 N 项，取第 [k] 轮时越界` | 列表没覆盖迭代轮次 | 补齐列表，用不到的位置写 `null` |
 | 把 `--set` 的包序号当成 0 起 | 脚本按 1 起数 | `P65[1]` 是第一个 |
 
-## 限制
-
-- 仓库里**没有** RBC 报文真机样本，示例 hex 只是本实现的自测基线；"自洽通过"不证明与 RBC 侧字节一致。
-- 生成侧只校验协议定长、报文上限、组成、方向和字段消费；不能验证 RBC 消费端的全部领域约束。
-- 一条消息 ≤ 500 字节；生成器不拼流，多条报文请分别生成。
-- P44 外层 `L_PACKET` 是否包含整个内层用户包、CTCS-152 的 `L_PACKET=118` 等取舍，以 `references/protocol.md` 附录 C 为准。

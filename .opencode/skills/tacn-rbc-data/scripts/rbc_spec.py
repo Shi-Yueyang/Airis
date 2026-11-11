@@ -13,6 +13,34 @@
 """
 
 import re
+import sys
+
+
+# ---------------------------------------------------------------------------
+# 终端编码
+# ---------------------------------------------------------------------------
+def ensure_utf8_stdio():
+    """把 stdout/stderr 固定为 UTF-8。
+
+    Windows 默认按系统代码页输出（中文环境 cp936/GBK），报告里的“↔”“−”不在 GBK 码表内，
+    会直接 UnicodeEncodeError。已经是 UTF-8，或流不支持 reconfigure（IDE、测试框架替换过
+    的流）时跳过。
+    """
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            continue
+        encoding = (getattr(stream, "encoding", "") or "").replace("-", "").lower()
+        if encoding == "utf8":
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 
 # ---------------------------------------------------------------------------
 # 方向

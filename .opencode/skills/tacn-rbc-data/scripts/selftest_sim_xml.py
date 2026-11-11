@@ -220,6 +220,7 @@ def case_reject():
 
 
 def main():
+    S.ensure_utf8_stdio()
     for fn in (case_c80, case_small, case_m3, case_p72, case_auto_length, case_reject):
         print("\n== %s ==" % fn.__name__)
         fn()

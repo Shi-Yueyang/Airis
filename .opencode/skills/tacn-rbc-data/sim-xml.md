@@ -8,7 +8,7 @@
 
 ## 必需输入
 
-- Python 3（仅标准库）。Windows PowerShell 先执行 `$env:PYTHONUTF8=1`。
+- Python 3（仅标准库）。
 - 一份取值 JSON（`--values`，**每次运行都必须给**），形状与 `generate.md` 完全相同：`header` + `packets`，
   外加每个分组的 `intent` + `provenance` 门禁块（`references/gate.md`）。字段名写法（`NAME(k)`、`NAME#n`、
   `NID_LRBG`、双 IP、文本）也相同。
@@ -56,7 +56,7 @@
 
 ## 工作流
 
-1. **准备取值** — 用 `gen_rbc_msg.py --describe <消息号>` 看报文结构，按 `SKILL.md` 的确认单收齐取值并写 `intent` + `provenance`（`references/gate.md`），再写 `header` + `packets`。先跑 `--list` 确认消息/信息包/用户包在模拟器支持范围内。
+1. **准备取值** — 用 `gen_rbc_msg.py --describe <消息号>` 看报文结构，按 `references/gate.md` 的确认单收齐取值并写 `intent` + `provenance`，再写 `header` + `packets`。先跑 `--list` 确认消息/信息包/用户包在模拟器支持范围内。
 2. **生成** — 生成器是 `scripts/gen_rbc_sim_xml.py`；下文的 `<skill-dir>` 指本技能目录，输出路径相对当前工作目录解析。
 
    ```sh

@@ -183,6 +183,7 @@ def decode_all(data, labels, options, split_mode):
 
 
 def main(argv=None):
+    S.ensure_utf8_stdio()
     ap = argparse.ArgumentParser(
         description="反解 TACN RBC 报文并输出 Markdown 字段报告（结构内置，见 references/protocol.md）",
         formatter_class=argparse.RawDescriptionHelpFormatter,

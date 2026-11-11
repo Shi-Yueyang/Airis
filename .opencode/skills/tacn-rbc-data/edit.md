@@ -2,7 +2,7 @@
 
 已有报文是唯一事实来源：除了要求改的字段，其它一切都要**经过验证**地保持不变。不需要第三个脚本：这就是"反解 → 改取值 → 重新生成 → 再反解对比"的组合。
 
-开始前先对齐：要改哪些字段、改成什么值、产物目录与文件名、是否允许覆盖已有文件。用户没说清就先问，按 `SKILL.md` 的确认单与 `references/gate.md` 执行，不得跳过门禁。
+开始前先对齐：要改哪些字段、改成什么值、产物目录与文件名、是否允许覆盖已有文件。用户没说清就先问，按 `references/gate.md` 的确认单执行，不得跳过门禁。
 
 ## 规则
 
@@ -19,10 +19,10 @@
 1. **反解并捕获** — 用 `dump_rbc_msg.py` 完整反解原报文，`--values-out` 导出全部已解出字段（含协议默认值）：
 
    ```sh
-   python <skill-dir>/scripts/dump_rbc_msg.py orig.hex --values-out before.json -o before_report.md
+   python <skill-dir>/scripts/dump_rbc_msg.py orig.hex --values-out before.json
    ```
 
-   在编辑任何内容之前，先按 `decode.md` 的「判定是否可信」检查 `before_report.md`；源报文不可靠就停下来，不要靠修改去"修"。
+   在编辑任何内容之前，先按 `decode.md` 的「判定是否可信」核对这次反解的报告（stdout 输出）；源报文不可靠就停下来，不要靠修改去"修"。
 2. **编辑取值** — 在 `before.json` 里只改正确报文/信息包分组下的目标键，另存为 `edited.json`（保留原文件）。例：把 M3 的 `L_ENDSECTION` 从 3000 改成 2500，就只把 `"L_ENDSECTION": 3000` 改成 `"L_ENDSECTION": 2500`。
    导出的文件自带 `intent`（`target=both`、`confirmed=true`）和 `provenance`（全部 `decoded`）；
    改了哪个段就把该段来源改成 `"user"`，否则审计行会把用户改动误记为反解值。门禁格式见
@@ -36,7 +36,7 @@
 4. **校验** — 再反解一次并导出，然后做键级差异对比：
 
    ```sh
-   python <skill-dir>/scripts/dump_rbc_msg.py new/M3.hex --values-out after.json -o after_report.md
+   python <skill-dir>/scripts/dump_rbc_msg.py new/M3.hex --values-out after.json
    ```
 
    对比脚本（贴进 `python -` 即可）：

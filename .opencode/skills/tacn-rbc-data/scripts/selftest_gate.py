@@ -82,6 +82,7 @@ def expect_fail(root, name, doc, needle, extra=None, func=None):
 
 
 def main():
+    S.ensure_utf8_stdio()
     root = tempfile.mkdtemp(prefix="rbc-gate-")
     try:
         doc = base_doc()

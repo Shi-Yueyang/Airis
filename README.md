@@ -62,7 +62,7 @@
 
 - OpenCode
 - Python 3：`cvc-data`、`tacn-rbc-data` 与打包校验脚本只依赖标准库；`smartcore-plug` 额外需要 `xlrd`（读 `.xls`）
-- Windows 命令行建议先 `set PYTHONUTF8=1`，否则中文报错可能显示成乱码
+- Windows 上跑打包校验脚本前建议先 `set PYTHONUTF8=1`，否则中文报错可能显示成乱码
 
 ## 启动
 

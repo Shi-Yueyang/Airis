@@ -12,7 +12,7 @@
 - **原始二进制**：`--format bin` 强制；默认按"首字节是不是已知的 NID_MESSAGE"自动判别。
 - 一条文件里有多条报文时加 `--split`，按 `L_MESSAGE` 逐条解析。
 - 报文结构来自 `references/protocol.md`，不需要模板文件。
-- Python 3，仅标准库。Windows PowerShell 先执行 `$env:PYTHONUTF8=1`（cmd 用 `set PYTHONUTF8=1`），否则中文报告可能乱码；报告建议用 `-o` 写文件后再读，不要依赖控制台回显。
+- Python 3，仅标准库。报告默认打 stdout，不要为了"看清输出"自己加 `-o` 写文件。
 
 ## 规则
 
@@ -20,6 +20,7 @@
 2. **不猜测**：未知 `NID_MESSAGE`、未收录的信息包/用户包、位流越界都只报告并停止该条报文，不要用"大概是这样"补字段。
 3. **先判定可信再依赖**：只有 `L_MESSAGE` 一致、每个包的 `L_PACKET` 声明与计算一致、位遍历闭合、组成校验无错误且没有告警时，报告里的字段值才可用。
 4. **先处理告警**：`L_MESSAGE`/`L_PACKET` 判 `MISMATCH`、`剩余 N bit 未解析`、`末尾填充位不是全 1`、未知包号等告警必须解决或解释清楚，再引用任何字段值。
+5. **不擅自落盘**：用户没有指定输出路径时，报告只打 stdout（内容在回复里交付），不要自选默认目录、临时目录或"顺便留一份"生成报告文件；用户明确给了路径才用 `-o`。
 
 ## 工作流
 
@@ -27,17 +28,18 @@
 2. **执行反解** — 解码器是 `scripts/dump_rbc_msg.py`；下文的 `<skill-dir>` 指本技能目录，输入输出路径相对当前工作目录解析。
 
    ```sh
-   python <skill-dir>/scripts/dump_rbc_msg.py m3.hex -o m3_report.md
    python <skill-dir>/scripts/dump_rbc_msg.py --hex "03 13 80 00 21 D7 FF D1 25 61 E8 2E 50"
-   python <skill-dir>/scripts/dump_rbc_msg.py capture.dat --format bin --split -o report.md
-   python <skill-dir>/scripts/dump_rbc_msg.py m3.hex --values-out values.json -o report.md
+   python <skill-dir>/scripts/dump_rbc_msg.py m3.hex
+   python <skill-dir>/scripts/dump_rbc_msg.py capture.dat --format bin --split
+   # 只有用户指定了路径才加 -o：
+   python <skill-dir>/scripts/dump_rbc_msg.py m3.hex -o m3_report.md
    ```
 
-   `-o` 把 Markdown 报告写入文件；不给则输出到 stdout。`--values-out` 是"定点修改"的捕获步骤（`edit.md`）：它把整条报文（含所有已解出的字段）写成 `gen_rbc_msg.py --values` 能直接吃的 JSON，并自动带上门禁块（`intent` 与全 `decoded` 的 `provenance`）；默认不用它，反解的交付物就是报告。
+   `-o` 把 Markdown 报告写入文件；不给则输出到 stdout，这是默认路径，**用户没指定文件就不要加 `-o`**。`--values-out` 是"定点修改"的捕获步骤（`edit.md`）：它把整条报文（含所有已解出的字段）写成 `gen_rbc_msg.py --values` 能直接吃的 JSON，并自动带上门禁块（`intent` 与全 `decoded` 的 `provenance`）；默认不用它，反解的交付物就是报告。
 
    | 选项 | 用途 |
    |---|---|
-   | `-o PATH` | 报告写文件；不给就打到 stdout |
+   | `-o PATH` | 报告写文件；不给就打到 stdout（默认，用户没指定路径时不要加） |
    | `--split` | 拼接流逐条解析（按 L_MESSAGE 切） |
    | `--values-out PATH` | 额外导出取值 JSON（编辑回环用） |
    | `--p72-charset utf-16-be\|utf-16-le\|gb18030` | P72 纯文本编码（附录 B-1） |
@@ -58,7 +60,7 @@
    - 没有告警；有告警就逐条解释清楚它在协议里意味着什么。
 
    不满足时**不要**引用报告里的字段值：位置可能已经漂移，越靠后的字段越不可信。
-5. **报告** — 写清输入文件、消息号与条数、`L_MESSAGE`/`L_PACKET` 结果、位遍历与组成校验结果、告警清单，以及没有执行的检查。
+5. **报告** — 写清输入文件、消息号与条数、`L_MESSAGE`/`L_PACKET` 结果、位遍历与组成校验结果、告警清单，以及没有执行的检查。没指定 `-o` 时报告内容就在回复里，不要额外落盘，也不要补一句"报告已保存到某路径"。
 
 ## 失败处理
 

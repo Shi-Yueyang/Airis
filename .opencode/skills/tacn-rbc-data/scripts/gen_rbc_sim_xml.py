@@ -84,6 +84,7 @@ def _prepare(doc, selected, options, charset, overrides, allow_placeholder):
 
 
 def main(argv=None):
+    S.ensure_utf8_stdio()
     ap = argparse.ArgumentParser(
         description="生成 RBC 模拟器 DataTable XML 输入文件（报文结构内置）",
         formatter_class=argparse.RawDescriptionHelpFormatter,

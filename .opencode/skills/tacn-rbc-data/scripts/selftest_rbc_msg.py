@@ -555,6 +555,7 @@ def run_robustness():
 
 
 def main():
+    S.ensure_utf8_stdio()
     ap = argparse.ArgumentParser(description="TACN RBC 编解码自检（无真机样本时的字节级回归）")
     ap.add_argument("-v", "--verbose", action="store_true", help="失败时打印解码字段行")
     ap.add_argument("-n", "--name", help="只跑名字里含该串的用例")

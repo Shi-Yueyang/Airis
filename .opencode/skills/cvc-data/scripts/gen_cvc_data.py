@@ -91,6 +91,29 @@ SDMU_SYMBOL = 0xA5A59696
 FIELD_ORDER = {ATP_SYMBOL: 0, SDMU_SYMBOL: 1}
 FIELD_SYMBOL_NAMES = {ATP_SYMBOL: "ATP", SDMU_SYMBOL: "SDMU"}
 
+
+def ensure_utf8_stdio():
+    """Force stdout/stderr to UTF-8.
+
+    Windows defaults to the system code page (cp936/GBK on Chinese installs), where some
+    characters used in reports raise UnicodeEncodeError. Skipped when already UTF-8 or
+    when the stream has no reconfigure() (replaced by an IDE or test framework).
+    """
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            continue
+        encoding = (getattr(stream, "encoding", "") or "").replace("-", "").lower()
+        if encoding == "utf8":
+            continue
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 # Domain rules the consumer's INIT_check_configuration_data enforces (SB7/EB
 # decelerations are divisors; the tables must not be empty). The generator
 # CHECKS the effective values against these and fails loudly — it never
@@ -449,6 +472,7 @@ def load_fields(template_paths, warn):
 
 
 def main(argv=None):
+    ensure_utf8_stdio()
     ap = argparse.ArgumentParser(
         description="Serialize the CVC ATP + SDMU config template XMLs into ASW1.bin / Config2.line1 / Config1.train",
         formatter_class=argparse.RawDescriptionHelpFormatter,

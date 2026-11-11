@@ -537,6 +537,7 @@ def describe_message(label, out=None):
 
 
 def main(argv=None):
+    S.ensure_utf8_stdio()
     ap = argparse.ArgumentParser(
         description="生成 TACN RBC 报文 hex（报文结构内置，见 references/protocol.md）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
