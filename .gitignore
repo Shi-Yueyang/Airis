@@ -79,3 +79,5 @@ desktop.ini
 .opencode/logs/
 **/out/**
 **/out
+example/**
+example
